@@ -53,7 +53,7 @@ class ModalController extends Controller
 
         // Trouver la classe de la séance
         $st = $pdo->prepare("
-            SELECT s.id, s.idclasse, c.classe, s.date, TIME_FORMAT(s.heured,'%H:%i') as heured, TIME_FORMAT(s.heuref,'%H:%i') as heuref
+            SELECT s.id, s.idclasse, c.classe, s.date, TIME_FORMAT(s.heured,'%H:%i') as heured
             FROM seances s
             JOIN classes c ON c.id = s.idclasse
             WHERE s.id = :id AND s.deleted_at IS NULL

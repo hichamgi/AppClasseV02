@@ -1,8 +1,11 @@
 <?php
+
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+$dotenv->load();
+
 return [
-    'name' => 'AppClasseV02',
-    'base_url' => '/AppClasseV02', // ex: '/AppClasseV02/public' si nécessaire, sinon laisser vide
-    'timezone' => 'Africa/Casablanca',
-    'env' => 'local',
-    'debug' => true,
+    'db_host' => $_ENV['DB_HOST'],
+    'db_name' => $_ENV['DB_NAME'],
+    'db_user' => $_ENV['DB_USER'],
+    'db_pass' => $_ENV['DB_PASS'],
 ];
