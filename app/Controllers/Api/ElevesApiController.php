@@ -1,0 +1,76 @@
+<?php
+declare(strict_types=1);
+
+namespace App\Controllers\Api;
+
+use App\Core\Controller;
+use App\Core\Database;
+use App\Models\Eleve;
+
+class ElevesApiController extends Controller
+{
+    public function index(): void
+    {
+        $q = trim((string)($_GET['q'] ?? ''));
+        $rows = $q !== '' ? Eleve::search($q, 50) : Eleve::all(50);
+        $this->json(['ok' => true, 'data' => $rows]);
+    }
+
+    public function show(array $args): void
+    {
+        $id = (int)($args['id'] ?? 0);
+        $row = Eleve::find($id);
+        if (!$row) $this->json(['ok' => false, 'error' => 'Not found'], 404);
+        $this->json(['ok' => true, 'data' => $row]);
+    }
+
+    // POST /api/seances/absence
+    // JSON: { "idseance": 1, "ideleve": 10, "absent": 1, "justify": 0 }
+    public function markAbsence(): void
+    {
+        $this->requireCsrf();
+        $data = $this->inputJson();
+
+        $idseance = (int)($data['idseance'] ?? 0);
+        $ideleve  = (int)($data['ideleve'] ?? 0);
+        $absent   = (int)($data['absent'] ?? 0);
+        $justify  = (int)($data['justify'] ?? 0);
+
+        if ($idseance <= 0 || $ideleve <= 0) {
+            $this->json(['ok' => false, 'error' => 'Bad payload'], 422);
+        }
+
+        // upsert (idseance, ideleve) unique
+        $sql = "INSERT INTO seances_eleves (idseance, ideleve, absent, justify, created_at, updated_at)
+                VALUES (:s, :e, :a, :j, NOW(), NOW())
+                ON DUPLICATE KEY UPDATE absent=VALUES(absent), justify=VALUES(justify), updated_at=NOW()";
+
+        $st = Database::pdo()->prepare($sql);
+        $st->execute(['s' => $idseance, 'e' => $ideleve, 'a' => $absent, 'j' => $justify]);
+
+        $this->json(['ok' => true]);
+    }
+
+    // POST /api/seances/partie
+    // JSON: { "idseance": 1, "idpartie": 5 }
+    public function attachPartie(): void
+    {
+        $this->requireCsrf();
+        $data = $this->inputJson();
+
+        $idseance = (int)($data['idseance'] ?? 0);
+        $idpartie = (int)($data['idpartie'] ?? 0);
+
+        if ($idseance <= 0 || $idpartie <= 0) {
+            $this->json(['ok' => false, 'error' => 'Bad payload'], 422);
+        }
+
+        $sql = "INSERT INTO seances_parties (idseance, idpartie, created_at, updated_at)
+                VALUES (:s, :p, NOW(), NOW())
+                ON DUPLICATE KEY UPDATE updated_at=NOW()";
+        $st = Database::pdo()->prepare($sql);
+        $st->execute(['s' => $idseance, 'p' => $idpartie]);
+
+        $this->json(['ok' => true]);
+    }
+}

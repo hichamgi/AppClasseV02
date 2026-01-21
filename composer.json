@@ -1,0 +1,30 @@
+{
+    "name": "hicham/appclassev2",
+    "description": "Application de gestion scolaire MVC avec PHP, JS et Bootstrap",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "scripts": {
+        "post-autoload-dump": [
+            "echo 'Autoload dump finished.'"
+        ]
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

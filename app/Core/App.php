@@ -1,0 +1,69 @@
+<?php
+declare(strict_types=1);
+
+namespace App\Core;
+
+use App\Middleware\AuthMiddleware;
+use App\Middleware\AdminMiddleware;
+
+class App
+{
+    private Router $router;
+    private array $config;
+
+    public function __construct()
+    {
+        $this->config = require dirname(__DIR__) . '/config/app.php';
+        date_default_timezone_set($this->config['timezone'] ?? 'UTC');
+
+        // DB singleton init
+        Database::init(require dirname(__DIR__) . '/config/database.php');
+
+        $this->router = new Router($this->config['base_url'] ?? '');
+        $this->registerRoutes();
+    }
+
+    public function run(): void
+    {
+        $this->router->dispatch();
+    }
+
+    private function registerRoutes(): void
+    {
+        // Web
+        $this->router->get('/login', 'App\\Controllers\\AuthController@loginForm');
+        $this->router->post('/login', 'App\\Controllers\\AuthController@login');
+        $this->router->get('/twofa', 'App\\Controllers\\AuthController@twofaForm');
+        $this->router->post('/twofa', 'App\\Controllers\\AuthController@twofaVerify');
+        $this->router->get('/logout', 'App\\Controllers\\AuthController@logout');
+
+        $this->router->get('/', 'App\\Controllers\\DashboardController@index', [AuthMiddleware::class]);
+        $this->router->get('/dashboard', 'App\\Controllers\\DashboardController@index', [AuthMiddleware::class]);
+
+        $this->router->get('/classes', 'App\\Controllers\\ClassesController@index', [AuthMiddleware::class]);
+        $this->router->get('/eleves', 'App\\Controllers\\ElevesController@index', [AuthMiddleware::class]);
+        $this->router->get('/eleves/{id}', 'App\\Controllers\\ElevesController@show', [AuthMiddleware::class]);
+
+        // API (JSON)
+        $this->router->get('/api/classes', 'App\\Controllers\\Api\\ClassesApiController@index', [AuthMiddleware::class]);
+        $this->router->get('/api/eleves', 'App\\Controllers\\Api\\ElevesApiController@index', [AuthMiddleware::class]);
+        $this->router->get('/api/eleves/{id}', 'App\\Controllers\\Api\\ElevesApiController@show', [AuthMiddleware::class]);
+
+        // Actions asynchrones (absences / parties)
+        $this->router->post('/api/seances/absence', 'App\\Controllers\\Api\\ElevesApiController@markAbsence', [AuthMiddleware::class]);
+        $this->router->post('/api/seances/partie', 'App\\Controllers\\Api\\ElevesApiController@attachPartie', [AuthMiddleware::class]);
+
+        // Modals (HTML partials)
+        $this->router->get('/modals/seances/new', 'App\\Controllers\\ModalController@newSeance', [AuthMiddleware::class]);
+        $this->router->get('/modals/seances/absences', 'App\\Controllers\\ModalController@absences', [AuthMiddleware::class]);
+        $this->router->get('/modals/seances/parties', 'App\\Controllers\\ModalController@parties', [AuthMiddleware::class]);
+        $this->router->get('/modals/eleves/tags', 'App\\Controllers\\ModalController@eleveTags', [AuthMiddleware::class]);
+
+        // API actions (JSON)
+        $this->router->post('/api/seances/create', 'App\\Controllers\\Api\\SeancesApiController@create', [AuthMiddleware::class]);
+        $this->router->post('/api/eleves/tags', 'App\\Controllers\\Api\\ElevesApiController@setTags', [AuthMiddleware::class]);
+
+        // Exemple route admin (si tu en as besoin plus tard)
+        $this->router->get('/admin', 'App\\Controllers\\DashboardController@index', [AuthMiddleware::class, AdminMiddleware::class]);
+    }
+}
