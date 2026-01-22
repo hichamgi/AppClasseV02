@@ -101,4 +101,97 @@ class SeancesApiController
         echo json_encode(['ok' => true, 'results' => $results, 'refresh' => true]);
     }
 
+    public function updateObservation(): void
+    {
+        // JSON response
+        header('Content-Type: application/json; charset=utf-8');
+
+        // CSRF (tu as déjà requireCsrf() dans Controller,
+        // ici on est dans un controller API simple -> si tu veux CSRF, fais-le dans Core middleware ou recode ici.
+        // Si ton CSRF est déjà vérifié ailleurs, ignore.
+        // Sinon, tu peux vérifier via Csrf::check sur HTTP_X_CSRF_TOKEN (comme dans Controller).
+
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw ?: '', true);
+        if (!is_array($data)) $data = [];
+
+        $idseance = (int)($data['idseance'] ?? 0);
+        $observation = trim((string)($data['observation'] ?? ''));
+
+        if ($idseance <= 0) {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'error' => 'idseance invalide']);
+            return;
+        }
+
+        // Option: limite raisonnable
+        if (mb_strlen($observation) > 2000) {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'error' => 'Observation trop longue (max 2000 caractères)']);
+            return;
+        }
+
+        $pdo = \App\Core\Database::pdo();
+
+        // check seance exists and not deleted
+        $st = $pdo->prepare("SELECT id FROM seances WHERE id=:id AND deleted_at IS NULL LIMIT 1");
+        $st->execute(['id' => $idseance]);
+        if (!$st->fetch()) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Séance introuvable']);
+            return;
+        }
+
+        $st = $pdo->prepare("UPDATE seances SET observation = :obs WHERE id = :id");
+        $st->execute([
+            'obs' => ($observation === '' ? null : $observation),
+            'id'  => $idseance,
+        ]);
+
+        echo json_encode(['ok' => true]);
+    }
+
+    public function detachPartie(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+
+        // CSRF
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (!\App\Core\Csrf::check((string)$token)) {
+            http_response_code(419);
+            echo json_encode(['ok' => false, 'error' => 'CSRF token mismatch']);
+            return;
+        }
+
+        $raw = file_get_contents('php://input');
+        $data = json_decode($raw ?: '', true);
+        if (!is_array($data)) $data = [];
+
+        $idseance = (int)($data['idseance'] ?? 0);
+        $idpartie = (int)($data['idpartie'] ?? 0);
+
+        if ($idseance <= 0 || $idpartie <= 0) {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'error' => 'Paramètres invalides']);
+            return;
+        }
+
+        $pdo = \App\Core\Database::pdo();
+
+        // (Optionnel) vérifier que la séance existe
+        $st = $pdo->prepare("SELECT id FROM seances WHERE id=:id AND deleted_at IS NULL LIMIT 1");
+        $st->execute(['id' => $idseance]);
+        if (!$st->fetch()) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Séance introuvable']);
+            return;
+        }
+
+        // Supprimer la liaison
+        $st = $pdo->prepare("DELETE FROM seances_parties WHERE idseance = :s AND idpartie = :p");
+        $st->execute(['s' => $idseance, 'p' => $idpartie]);
+
+        echo json_encode(['ok' => true]);
+    }
+
 }

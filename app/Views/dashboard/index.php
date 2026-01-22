@@ -15,6 +15,9 @@ $grid = $timetable['grid'] ?? [];
 $hours = $timetable['hours'] ?? [];
 $classStyle = $timetable['classStyle'] ?? [];
 
+$baseUrl = (require dirname(__DIR__, 2) . '/config/app.php')['base_url'] ?? '';
+$baseUrl = rtrim($baseUrl, '/');
+
 /*
 $allHours = [];
 foreach ($timetable as $c) {
@@ -62,12 +65,55 @@ sort($allHours);
   </div>
 </div>
 
-<!--
-  Remarque:
-  - On évite un bouton "Nouvelle séance" hardcodé (idclasse=122).
-  - La création de séance se fait via clic sur la classe (dans le créneau) => modal préremplie (date=today, heured=ligne).
-  - La création groupée se fait via clic sur un jour (header).
--->
+<h2 class="h5 mt-4 mb-2">Séances du jour</h2>
+
+<?php if (empty($todaySeances)): ?>
+  <div class="text-muted mb-3">Aucune séance aujourd’hui.</div>
+<?php else: ?>
+  <div class="card mb-3">
+    <div class="table-responsive">
+      <table class="table table-sm mb-0 align-middle">
+        <thead>
+          <tr>
+            <th style="white-space:nowrap;">Heure</th>
+            <th>Classe</th>
+            <th>Absents (numéros)</th>
+            <th style="white-space:nowrap;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($todaySeances as $s): ?>
+            <?php
+              $start = DateTime::createFromFormat('H:i', (string)$s['heured']);
+              $end = (clone $start)->modify('+1 hour');
+              $range = $start->format('H:i') . ' - ' . $end->format('H:i');
+              $abs = trim((string)($s['absents_numeros'] ?? ''));
+            ?>
+            <tr>
+              <td style="white-space:nowrap;"><?= htmlspecialchars($range, ENT_QUOTES, 'UTF-8') ?></td>
+              <td><?= htmlspecialchars((string)$s['classe'], ENT_QUOTES, 'UTF-8') ?></td>
+              <td>
+                <?php if ($abs !== ''): ?>
+                  <span class="ms-2"><?= htmlspecialchars($abs, ENT_QUOTES, 'UTF-8') ?></span>
+                <?php else: ?>
+                  <span class="text-muted">—</span>
+                <?php endif; ?>
+              </td>
+              <td style="white-space:nowrap;">
+                <a class="btn btn-sm btn-outline-primary"
+                   href="<?= $baseUrl ?>/seances/<?= (int)$s['id'] ?>">
+                  Ouvrir
+                </a>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<?php endif; ?>
+
+
 
 <h2 class="h5 mt-4 mb-2">Emploi du temps (global)</h2>
 

@@ -13,6 +13,7 @@ class DashboardController extends Controller
         $svc = new DashboardService();
 
         $annee = $svc->currentAnnee();
+        
         if (!$annee) {
             $this->view('dashboard/index', [
                 'annee' => null,
@@ -26,6 +27,7 @@ class DashboardController extends Controller
         }
 
         $idannee = (int)$annee['id'];
+        $todaySeances = $svc->todaySeances($idannee);
 
         $classesCount = $svc->countClassesForAnnee($idannee);
         $elevesActifsCount = $svc->countElevesActifsForAnnee($idannee);
@@ -41,7 +43,8 @@ class DashboardController extends Controller
             'elevesActifsCount',
             'timetable',
             'showSaturday',
-            'lastParties'
+            'lastParties',
+            'todaySeances'
         ));
     }
 }

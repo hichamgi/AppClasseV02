@@ -300,4 +300,40 @@ class DashboardService
         $st->execute(['a' => $idannee]);
         return (bool)$st->fetchColumn();
     }
+
+    public function todaySeances(int $idannee): array
+    {
+        $pdo = \App\Core\Database::pdo();
+
+        $sql = "
+            SELECT
+                s.id,
+                s.idclasse,
+                c.classe,
+                TIME_FORMAT(s.heured, '%H:%i') AS heured,
+                -- liste des numéros absents (triée)
+                GROUP_CONCAT(DISTINCT ec.numero ORDER BY ec.numero SEPARATOR ', ') AS absents_numeros,
+                COUNT(DISTINCT ec.ideleve) AS absents_count
+            FROM seances s
+            JOIN classes c ON c.id = s.idclasse
+            LEFT JOIN seances_eleves se
+                ON se.idseance = s.id AND se.absent = 1
+            LEFT JOIN eleves_classes ec
+                ON ec.ideleve = se.ideleve
+            AND ec.idclasse = s.idclasse
+            AND ec.depart = 0
+            WHERE c.idannee = :a
+            AND c.deleted_at IS NULL
+            AND s.deleted_at IS NULL
+            AND s.date = CURDATE()
+            GROUP BY s.id, s.idclasse, c.classe, s.heured
+            ORDER BY s.heured ASC, c.classe ASC
+        ";
+
+        $st = $pdo->prepare($sql);
+        $st->execute(['a' => $idannee]);
+        return $st->fetchAll();
+    }
+
+
 }

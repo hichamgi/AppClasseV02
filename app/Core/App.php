@@ -44,14 +44,21 @@ class App
         $this->router->get('/eleves', 'App\\Controllers\\ElevesController@index', [AuthMiddleware::class]);
         $this->router->get('/eleves/{id}', 'App\\Controllers\\ElevesController@show', [AuthMiddleware::class]);
 
+        $this->router->get('/seances/{id}', 'App\\Controllers\\SeancesController@show', [AuthMiddleware::class]);
+
         // API (JSON)
         $this->router->get('/api/classes', 'App\\Controllers\\Api\\ClassesApiController@index', [AuthMiddleware::class]);
         $this->router->get('/api/eleves', 'App\\Controllers\\Api\\ElevesApiController@index', [AuthMiddleware::class]);
         $this->router->get('/api/eleves/{id}', 'App\\Controllers\\Api\\ElevesApiController@show', [AuthMiddleware::class]);
+        
 
         // Actions asynchrones (absences / parties)
         $this->router->post('/api/seances/absence', 'App\\Controllers\\Api\\ElevesApiController@markAbsence', [AuthMiddleware::class]);
         $this->router->post('/api/seances/partie', 'App\\Controllers\\Api\\ElevesApiController@attachPartie', [AuthMiddleware::class]);
+        $this->router->post('/api/seances/observation', 'App\\Controllers\\Api\\SeancesApiController@updateObservation', [AuthMiddleware::class]);
+        $this->router->post('/api/seances/partie/delete', 'App\\Controllers\\Api\\SeancesApiController@detachPartie', [AuthMiddleware::class]);
+
+
 
         // Modals (HTML partials)
         $this->router->get('/modals/seances/new', 'App\\Controllers\\ModalController@newSeance', [AuthMiddleware::class]);

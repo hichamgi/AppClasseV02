@@ -14,6 +14,9 @@ $user = Auth::user();
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AppClasseV02</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="<?= $baseUrl ?>/assets/css/app.css">
   <meta name="csrf-token" content="<?= htmlspecialchars(Csrf::token(), ENT_QUOTES, 'UTF-8') ?>">
   <meta name="base-url" content="<?= htmlspecialchars($baseUrl, ENT_QUOTES, 'UTF-8') ?>">
 </head>

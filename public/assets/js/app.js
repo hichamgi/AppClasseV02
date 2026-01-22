@@ -169,7 +169,7 @@
     async markAbsence(payload) {
       try {
         await postJson('/api/seances/absence', payload);
-        alert('OK: absence mise à jour');
+        console.log('OK: absence mise à jour');
       } catch (e) {
         alert('Erreur: ' + e.message);
       }
@@ -178,11 +178,20 @@
     async attachPartie(payload) {
       try {
         await postJson('/api/seances/partie', payload);
-        alert('OK: partie attachée');
+        console.log('OK: partie attachée');
       } catch (e) {
         alert('Erreur: ' + e.message);
       }
+    },
+
+    async updateObservation(payload) {
+      return await postJson('/api/seances/observation', payload);
+    },
+
+    async detachPartie(payload) {
+      return await postJson('/api/seances/partie/delete', payload);
     }
+
   };
 
   // -----------------------
