@@ -4,4 +4,4 @@
 *.log
 /storage/
 cache/
-.vscode/
+/.vscode/
