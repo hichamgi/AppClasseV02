@@ -37,25 +37,68 @@ class SeancesController extends Controller
             return;
         }
 
+        // Séance précédente (même classe) : strictement avant (date, heured)
+        $st = $pdo->prepare("
+            SELECT id
+            FROM seances
+            WHERE idclasse = :cid
+            AND deleted_at IS NULL
+            AND (
+                date < :dte1
+                OR (date = :dte2 AND heured < :hdebut)
+            )
+            ORDER BY date DESC, heured DESC
+            LIMIT 1
+        ");
+
+        $st->execute([
+            'cid'    => (int)$seance['idclasse'],
+            'dte1'   => (string)$seance['date'],
+            'dte2'   => (string)$seance['date'],
+            'hdebut' => (string)$seance['heured'], // 'HH:MM'
+        ]);
+
+        $prevSeanceId = (int)($st->fetchColumn() ?: 0);
+
+
         // Élèves actifs de la classe + état absence (pour cette séance)
         $st = $pdo->prepare("
-            SELECT
-              e.id,
-              ec.numero,
-              e.nom, e.prenom,
-              COALESCE(se.absent,0) AS absent,
-              COALESCE(se.justify,0) AS justify
-            FROM eleves_classes ec
-            JOIN eleves e ON e.id = ec.ideleve AND e.deleted_at IS NULL
-            LEFT JOIN seances_eleves se ON se.idseance = :idseance AND se.ideleve = e.id
-            WHERE ec.idclasse = :idclasse AND ec.depart = 0
-            ORDER BY ec.numero ASC, e.nom ASC, e.prenom ASC
+        SELECT
+            e.id,
+            ec.numero,
+            e.nom, e.prenom,
+            e.nomar, e.prenomar,
+            COALESCE(ds.points, 0) AS points,
+            COALESCE(ds.participation, 0) AS participation,
+            COALESCE(cur.absent, 0) AS absent,
+            COALESCE(cur.justify, 0) AS justify,
+            COALESCE(prev.absent, 0) AS prev_absent
+        FROM eleves_classes ec
+        JOIN eleves e
+            ON e.id = ec.ideleve AND e.deleted_at IS NULL
+
+        LEFT JOIN dossiers_scolaires ds
+            ON ds.ideleve = e.id AND ds.idannee = :idannee
+
+        LEFT JOIN seances_eleves cur
+            ON cur.idseance = :idseance AND cur.ideleve = e.id
+
+        LEFT JOIN seances_eleves prev
+            ON prev.idseance = :prevSeanceId AND prev.ideleve = e.id
+
+        WHERE ec.idclasse = :idclasse
+            AND ec.depart = 0
+        ORDER BY ec.numero ASC, e.nom ASC, e.prenom ASC
         ");
         $st->execute([
-            'idseance' => (int)$seance['id'],
-            'idclasse' => (int)$seance['idclasse'],
+        'idseance'     => (int)$seance['id'],
+        'prevSeanceId' => $prevSeanceId,
+        'idclasse'     => (int)$seance['idclasse'],
+        'idannee'      => (int)$seance['idannee'],
         ]);
         $eleves = $st->fetchAll();
+
+
 
         // Parties (toutes) + date dernière réalisation pour cette classe + déjà liée à cette séance
         $st = $pdo->prepare("

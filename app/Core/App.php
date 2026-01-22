@@ -65,6 +65,8 @@ class App
         $this->router->get('/modals/seances/absences', 'App\\Controllers\\ModalController@absences', [AuthMiddleware::class]);
         $this->router->get('/modals/seances/parties', 'App\\Controllers\\ModalController@parties', [AuthMiddleware::class]);
         $this->router->get('/modals/eleves/tags', 'App\\Controllers\\ModalController@eleveTags', [AuthMiddleware::class]);
+        $this->router->get('/modals/eleves/show', 'App\\Controllers\\ModalController@eleveShow', [\App\Middleware\AuthMiddleware::class]);
+
 
         // API actions (JSON)
         $this->router->post('/api/seances/create', 'App\\Controllers\\Api\\SeancesApiController@create', [AuthMiddleware::class]);

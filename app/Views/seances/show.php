@@ -35,27 +35,43 @@
         <table class="table table-sm mb-0 align-middle">
           <thead>
             <tr>
-              <th style="width:90px;">N°</th>
-              <th>Élève</th>
+              <th style="width:70px;">N°</th>
+              <th>Nom (FR)</th>
+              <th>الاسم (AR)</th>
+              <th style="width:90px;">Points</th>
+              <th style="width:120px;">Participation</th>
               <th style="width:110px;">Absent</th>
             </tr>
           </thead>
           <tbody>
-            <?php foreach ($eleves as $e): ?>
-              <tr>
-                <td><?= (int)$e['numero'] ?></td>
-                <td><?= htmlspecialchars($e['nom'].' '.$e['prenom'], ENT_QUOTES, 'UTF-8') ?></td>
-                <td>
-                  <input type="checkbox"
-                         class="form-check-input js-abs"
-                         data-idseance="<?= (int)$seance['id'] ?>"
-                         data-ideleve="<?= (int)$e['id'] ?>"
-                         <?= ((int)$e['absent'] === 1) ? 'checked' : '' ?>>
-                </td>
-              </tr>
-            <?php endforeach; ?>
+          <?php foreach ($eleves as $e): ?>
+            <?php $prevAbsent = ((int)($e['prev_absent'] ?? 0) === 1); ?>
+            <tr class="<?= $prevAbsent ? 'table-danger' : '' ?>"
+                style="cursor:pointer"
+                data-modal="/modals/eleves/show?ideleve=<?= (int)$e['id'] ?>&idclasse=<?= (int)$seance['idclasse'] ?>&idannee=<?= (int)$seance['idannee'] ?>"
+                data-modal-size="modal-xl">
+              <td><?= (int)$e['numero'] ?></td>
+              <td><?= htmlspecialchars($e['nom'].' '.$e['prenom'], ENT_QUOTES, 'UTF-8') ?></td>
+              <td dir="rtl"><?= htmlspecialchars(($e['nomar'] ?? '').' '.($e['prenomar'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+              <td><?= (int)$e['points'] ?></td>
+              <td><?= (int)$e['participation'] ?></td>
+              <td>
+                <input type="checkbox"
+                      class="form-check-input js-abs"
+                      data-idseance="<?= (int)$seance['id'] ?>"
+                      data-ideleve="<?= (int)$e['id'] ?>"
+                      <?= ((int)$e['absent'] === 1) ? 'checked' : '' ?>
+                      onclick="event.stopPropagation()">
+              </td>
+            </tr>
+          <?php endforeach; ?>
           </tbody>
+
         </table>
+        <div class="small text-muted mb-2">
+          Les élèves en <span class="badge text-bg-danger">rouge</span> étaient absents à la séance précédente.
+        </div>
+
       </div>
     </div>
   </div>

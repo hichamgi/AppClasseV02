@@ -45,12 +45,13 @@ $user = Auth::user();
   <?= $content ?>
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="<?= $baseUrl ?>/assets/js/app.js"></script>
 <div class="modal fade" id="appModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content" id="appModalContent"></div>
   </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="<?= $baseUrl ?>/assets/js/app.js"></script>
 </body>
 </html>

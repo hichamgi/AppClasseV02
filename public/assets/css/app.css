@@ -12,3 +12,13 @@
   background: #0d6efd;
   color: #fff;
 }
+
+/* Force le scroll interne des modals longues */
+.modal-dialog.modal-dialog-scrollable .modal-content{
+  max-height: calc(100vh - 2rem);
+}
+
+.modal-dialog.modal-dialog-scrollable .modal-body{
+  overflow-y: auto !important;
+}
+
