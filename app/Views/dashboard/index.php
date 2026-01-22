@@ -16,8 +16,6 @@ $hours = $timetable['hours'] ?? [];
 $classStyle = $timetable['classStyle'] ?? [];
 
 /*
-
-// collecter toutes les heures présentes pour afficher une grille stable
 $allHours = [];
 foreach ($timetable as $c) {
     foreach (($c['slots'] ?? []) as $n => $hours) {
@@ -25,7 +23,8 @@ foreach ($timetable as $c) {
     }
 }
 $allHours = array_keys($allHours);
-sort($allHours);*/
+sort($allHours);
+*/
 ?>
 
 <h1 class="h3 mb-3">Tableau de bord</h1>
@@ -63,11 +62,12 @@ sort($allHours);*/
   </div>
 </div>
 
-<button class="btn btn-sm btn-primary"
-        data-modal="/modals/seances/new?idclasse=<?= 122 ?>"
-        data-modal-size="modal-lg">
-  Nouvelle séance
-</button>
+<!--
+  Remarque:
+  - On évite un bouton "Nouvelle séance" hardcodé (idclasse=122).
+  - La création de séance se fait via clic sur la classe (dans le créneau) => modal préremplie (date=today, heured=ligne).
+  - La création groupée se fait via clic sur un jour (header).
+-->
 
 <h2 class="h5 mt-4 mb-2">Emploi du temps (global)</h2>
 
@@ -85,7 +85,7 @@ function slotState(int $dayN, string $h, DateTime $now): string
     $todayN = (int)$now->format('N');
 
     if ($dayN < $todayN) return 'past';
-    if ($dayN > $todayN) return 'past';
+    if ($dayN > $todayN) return 'future';
 
     $nowMin   = ((int)$now->format('H')) * 60 + (int)$now->format('i');
     $startMin = ((int)$start->format('H')) * 60 + (int)$start->format('i');
@@ -93,7 +93,7 @@ function slotState(int $dayN, string $h, DateTime $now): string
 
     if ($nowMin >= $endMin) return 'past';
     if ($nowMin >= $startMin && $nowMin < $endMin) return 'current';
-    return 'past';
+    return 'future';
 }
 ?>
 
@@ -108,10 +108,17 @@ function slotState(int $dayN, string $h, DateTime $now): string
             <tr>
               <th style="white-space:nowrap;text-align:left;">Heure</th>
               <?php foreach ($dayKeys as $dk): ?>
-                <th><?= htmlspecialchars($days[$dk], ENT_QUOTES, 'UTF-8') ?></th>
+                <th class="day-header"
+                    role="button"
+                    tabindex="0"
+                    data-weekday="<?= (int)$dk ?>"
+                    style="cursor:pointer; user-select:none;">
+                  <?= htmlspecialchars($days[$dk], ENT_QUOTES, 'UTF-8') ?>
+                </th>
               <?php endforeach; ?>
             </tr>
           </thead>
+
           <tbody>
             <?php foreach ($hours as $h): ?>
               <?php
@@ -120,11 +127,10 @@ function slotState(int $dayN, string $h, DateTime $now): string
                 $range = $start->format('H:i') . ' - ' . $end->format('H:i');
 
                 // État de la ligne "heure" selon aujourd'hui (utile pour griser toute la ligne si passé)
-                // On se base sur le jour "todayN" pour l'état de la ligne
                 $rowState = slotState($todayN, $h, $now);
                 $rowStyle = ($todayN <= 6 && $rowState === 'past') ? 'background: rgba(0,0,0,.02); opacity:.75;' : '';
               ?>
-              <tr style="<?= $rowStyle ?>">
+              <tr style="<?= $rowStyle ?>" data-heured="<?= htmlspecialchars($h, ENT_QUOTES, 'UTF-8') ?>">
                 <td style="white-space:nowrap;text-align:left;">
                   <?= htmlspecialchars($range, ENT_QUOTES, 'UTF-8') ?>
                 </td>
@@ -140,12 +146,14 @@ function slotState(int $dayN, string $h, DateTime $now): string
                     } elseif ($state === 'current') {
                         // surlignage propre
                         $tdStyle = 'background: rgba(13,110,253,.10); box-shadow: inset 0 0 0 2px rgba(13,110,253,.35);';
+                    } elseif ($state === 'future') {
+                        $tdStyle = '';
                     }
 
                     $cell = $grid[$dk][$h] ?? null;
                   ?>
 
-                  <td style="<?= $tdStyle ?>">
+                  <td style="<?= $tdStyle ?>" data-weekday="<?= (int)$dk ?>">
                     <?php if ($cell): ?>
                       <?php
                         $cid = (int)$cell['idclasse'];
@@ -154,24 +162,33 @@ function slotState(int $dayN, string $h, DateTime $now): string
                         $style = $classStyle[$cid] ?? ['bg' => 'hsl(0 0% 90%)', 'text' => '#111'];
                         $badgeOpacity = ($state === 'past') ? 'opacity:.75;' : '';
                       ?>
-                      <span
-                        style="
-                          display:inline-block;
-                          padding: .25rem .5rem;
-                          border-radius: 999px;
-                          background: <?= htmlspecialchars($style['bg'], ENT_QUOTES, 'UTF-8') ?>;
-                          color: <?= htmlspecialchars($style['text'], ENT_QUOTES, 'UTF-8') ?>;
-                          border: 1px solid rgba(0,0,0,.10);
-                          font-weight: 600;
-                          font-size: .85rem;
-                          line-height: 1.2;
-                          max-width: 200px;
-                          white-space: normal;
-                          <?= $badgeOpacity ?>
-                        "
-                      >
+
+                      <!-- IMPORTANT:
+                           - class-click + data-classe-id => utilisé par public/assets/app.js
+                           - heured vient du <tr data-heured=".."> => la seule façon de changer l'heure = cliquer la classe sur la ligne voulue
+                      -->
+                      <a href="#"
+                         class="class-click"
+                         data-classe-id="<?= (int)$cid ?>"
+                         style="
+                           text-decoration:none;
+                           display:inline-block;
+                           padding: .25rem .5rem;
+                           border-radius: 999px;
+                           background: <?= htmlspecialchars($style['bg'], ENT_QUOTES, 'UTF-8') ?>;
+                           color: <?= htmlspecialchars($style['text'], ENT_QUOTES, 'UTF-8') ?>;
+                           border: 1px solid rgba(0,0,0,.10);
+                           font-weight: 600;
+                           font-size: .85rem;
+                           line-height: 1.2;
+                           max-width: 200px;
+                           white-space: normal;
+                           cursor: pointer;
+                           <?= $badgeOpacity ?>
+                         ">
                         <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>
-                      </span>
+                      </a>
+
                     <?php else: ?>
                       <span class="text-muted">—</span>
                     <?php endif; ?>
@@ -181,6 +198,7 @@ function slotState(int $dayN, string $h, DateTime $now): string
               </tr>
             <?php endforeach; ?>
           </tbody>
+
         </table>
       </div>
 
@@ -211,7 +229,8 @@ function slotState(int $dayN, string $h, DateTime $now): string
       </div>
 
       <div class="text-muted small mt-2">
-        Créneau en cours : surligné. Créneaux passés : grisés.
+        Clique sur une <strong>classe</strong> pour créer une séance (date=aujourd’hui, heure=ligne).
+        Clique sur un <strong>jour</strong> pour créer toutes les séances de ce jour (aujourd’hui ou prochaine occurrence).
       </div>
 
     </div>
@@ -230,7 +249,6 @@ function slotState(int $dayN, string $h, DateTime $now): string
         <thead>
           <tr>
             <th>Classe</th>
-            <th>Dernière séance</th>
             <th>Module</th>
             <th>Partie</th>
           </tr>
@@ -240,22 +258,24 @@ function slotState(int $dayN, string $h, DateTime $now): string
             <tr>
               <td><?= htmlspecialchars($lp['classe'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
               <td>
-                <?php if (!empty($lp['date'])): ?>
-                  <?= htmlspecialchars($lp['date'], ENT_QUOTES, 'UTF-8') ?>
-                  <?= htmlspecialchars($lp['heured'] ?? '', ENT_QUOTES, 'UTF-8') ?>
-                <?php else: ?>
-                  <span class="text-muted">—</span>
-                <?php endif; ?>
-              </td>
-              <td>
-                <?php
-                  $mod = $lp['abrev'] ?: $lp['module'];
-                  echo $mod ? htmlspecialchars((string)$mod, ENT_QUOTES, 'UTF-8') : '<span class="text-muted">—</span>';
-                ?>
+                <span class="badge bg-secondary">
+                   <?= htmlspecialchars($lp['abrev'] ?: $lp['module']) ?>
+                </span>
               </td>
               <td>
                 <?php if (!empty($lp['partie'])): ?>
-                  <?= htmlspecialchars(($lp['num'] ? $lp['num'] . ' - ' : '') . $lp['partie'], ENT_QUOTES, 'UTF-8') ?>
+                  <strong><?= htmlspecialchars($lp['partie'], ENT_QUOTES, 'UTF-8') ?></strong>
+                  <br>
+                  <small class="text-muted">
+                    <?= htmlspecialchars($lp['abrev'] ?: $lp['module'], ENT_QUOTES, 'UTF-8') ?>
+                    <?= $lp['num'] ? ' – ' . htmlspecialchars($lp['num'], ENT_QUOTES, 'UTF-8') : '' ?>
+                  </small>
+                  <br>
+                  
+                  <br>
+                  <span class="badge bg-light text-dark">
+                    <?= htmlspecialchars($lp['num']) ?>
+                  </span>
                 <?php else: ?>
                   <span class="text-muted">—</span>
                 <?php endif; ?>

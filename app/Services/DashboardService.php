@@ -92,58 +92,48 @@ class DashboardService
      */
     public function lastPartieByClasseForAnnee(int $idannee): array
     {
+        $pdo = \App\Core\Database::pdo();
+
         $sql = "
+        SELECT
+            c.id AS idclasse,
+            c.classe,
+            p.partie,
+            p.num,
+            m.module,
+            m.abrev
+        FROM seances_parties sp
+        JOIN seances s ON s.id = sp.idseance AND s.deleted_at IS NULL
+        JOIN classes c ON c.id = s.idclasse AND c.deleted_at IS NULL
+        JOIN parties p ON p.id = sp.idpartie
+        JOIN modules m ON m.id = p.idmodule
+        JOIN (
             SELECT
                 c.id AS idclasse,
-                c.classe,
-                s.date,
-                s.heured,
-                p.partie,
-                p.num,
-                m.module,
-                m.abrev
-            FROM classes c
-            LEFT JOIN (
-                SELECT s1.*
-                FROM seances s1
-                JOIN (
-                    SELECT idclasse, MAX(CONCAT(date, ' ', heured)) AS max_dt
-                    FROM seances
-                    WHERE deleted_at IS NULL
-                    GROUP BY idclasse
-                ) x ON x.idclasse = s1.idclasse AND CONCAT(s1.date, ' ', s1.heured) = x.max_dt
-                WHERE s1.deleted_at IS NULL
-            ) s ON s.idclasse = c.id
-            LEFT JOIN seances_parties sp ON sp.idseance = s.id
-            LEFT JOIN parties p ON p.id = sp.idpartie
-            LEFT JOIN modules m ON m.id = p.idmodule
-            WHERE c.idannee = :a AND c.deleted_at IS NULL
-            ORDER BY c.classe, s.date DESC, s.heured DESC, p.id DESC
+                MAX(sp.id) AS last_sp_id
+            FROM seances_parties sp
+            JOIN seances s ON s.id = sp.idseance AND s.deleted_at IS NULL
+            JOIN classes c ON c.id = s.idclasse AND c.deleted_at IS NULL
+            WHERE c.idannee = :idannee
+            GROUP BY c.id
+        ) last ON last.idclasse = c.id AND last.last_sp_id = sp.id
+        ORDER BY c.classe
         ";
 
-        $st = Database::pdo()->prepare($sql);
-        $st->execute(['a' => $idannee]);
+        $st = $pdo->prepare($sql);
+        $st->execute(['idannee' => $idannee]);
+
         $rows = $st->fetchAll();
 
-        // On veut 1 ligne "représentative" par classe : la première rencontrée suffit grâce au ORDER BY.
         $out = [];
         foreach ($rows as $r) {
-            $cid = (int)$r['idclasse'];
-            if (isset($out[$cid])) continue;
-
-            $out[$cid] = [
-                'classe' => $r['classe'],
-                'date'   => $r['date'] ?? null,
-                'heured' => $r['heured'] ?? null,
-                'module' => $r['module'] ?? null,
-                'abrev'  => $r['abrev'] ?? null,
-                'partie' => $r['partie'] ?? null,
-                'num'    => $r['num'] ?? null,
-            ];
+            $out[(int)$r['idclasse']] = $r;
         }
 
         return $out;
     }
+
+
 
     /**
      * Détermine si le samedi doit être affiché : s'il existe au moins une entrée n=6.

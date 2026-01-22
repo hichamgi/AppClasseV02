@@ -17,6 +17,17 @@ class ModalController extends Controller
     public function newSeance(): void
     {
         $idclasse = (int)($_GET['idclasse'] ?? 0);
+        $date = trim((string)($_GET['date'] ?? ''));
+        $heured = trim((string)($_GET['heured'] ?? ''));
+
+        // Validation simple
+        if ($date !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            $date = '';
+        }
+        if ($heured !== '' && !preg_match('/^\d{2}:\d{2}$/', $heured)) {
+            $heured = '';
+        }
+
         if ($idclasse <= 0) {
             http_response_code(400);
             echo "Paramètre idclasse manquant";
@@ -36,7 +47,9 @@ class ModalController extends Controller
 
         $this->view('modals/seances_new', [
             'baseUrl' => $this->baseUrl(),
-            'classe' => $classe,
+            'classe'  => $classe,
+            'date'    => $date,
+            'heured'  => $heured,
         ], layout: null);
     }
 
