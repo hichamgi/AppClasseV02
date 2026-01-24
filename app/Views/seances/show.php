@@ -97,14 +97,11 @@
                       onclick="event.stopPropagation()">
 
                 <a href="#"
-                  class="js-modal small text-decoration-none"
-                  data-modal="/modals/absences/list?ideleve=<?= (int)$e['id'] ?>&idannee=<?= (int)$seance['idannee'] ?>"
+                  data-modal="/modals/absences/list?ideleve=<?= $e['id'] ?>&idannee=<?= $seance['idannee'] ?>"
                   data-modal-size="modal-lg"
-                  onclick="event.preventDefault(); event.stopPropagation();"
-                  title="Voir toutes les absences de l'année">
-                  <span class="badge text-bg-secondary">
-                    Abs: <?= (int)($e['abs_year'] ?? 0) ?>
-                  </span>
+                  class="text-decoration-none fw-semibold"
+                  onclick="event.preventDefault(); event.stopPropagation();">
+                  Abs: <?= (int)$e['abs_year'] ?>
                 </a>
               </td>
             </tr>
