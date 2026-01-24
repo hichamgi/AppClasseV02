@@ -387,6 +387,54 @@ class ModalController extends Controller
 
     }
 
+    public function absencesList(): void
+    {
+        $ideleve = (int)($_GET['ideleve'] ?? 0);
+        $idannee = (int)($_GET['idannee'] ?? 0);
+
+        if ($ideleve <= 0 || $idannee <= 0) {
+            http_response_code(400);
+            echo "Paramètres invalides";
+            return;
+        }
+
+        $pdo = \App\Core\Database::pdo();
+
+        // Identité (optionnel mais utile dans titre)
+        $st = $pdo->prepare("SELECT id, nom, prenom, nomar, prenomar FROM eleves WHERE id=:id LIMIT 1");
+        $st->execute(['id' => $ideleve]);
+        $eleve = $st->fetch() ?: [];
+
+        // Liste des absences sur l'année
+        $st = $pdo->prepare("
+        SELECT
+            s.id AS idseance,
+            c.classe,
+            s.date,
+            TIME_FORMAT(s.heured, '%H:%i') AS heured
+        FROM seances_eleves se
+        JOIN seances s ON s.id = se.idseance AND s.deleted_at IS NULL
+        JOIN classes c ON c.id = s.idclasse AND c.deleted_at IS NULL
+        WHERE se.ideleve = :e
+            AND se.absent = 1
+            AND c.idannee = :a
+        ORDER BY s.date DESC, s.heured DESC
+        ");
+        $st->execute(['e' => $ideleve, 'a' => $idannee]);
+        $rows = $st->fetchAll();
+
+        $cfg = require dirname(__DIR__) . '/config/app.php';
+        $baseUrl = rtrim($cfg['base_url'] ?? '', '/');
+
+        $this->view('modals/absences_list', [
+            'baseUrl' => $baseUrl,
+            'eleve' => $eleve,
+            'rows' => $rows,
+            'idannee' => $idannee,
+        ], 'modal');
+    }
+
+
     private function buildParentReportPrompt(array $byYear, array $absenceStats, array $tags, int $currentYearId, int $currentClasseId, string $notesBlock): string
     {
         // Infos année courante

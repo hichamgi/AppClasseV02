@@ -88,13 +88,24 @@
                   <i class="bi bi-plus"></i>
                 </button>
               </td>
-              <td>
+              <td class="text-nowrap">
                 <input type="checkbox"
-                      class="form-check-input js-abs"
+                      class="form-check-input js-abs me-2"
                       data-idseance="<?= (int)$seance['id'] ?>"
                       data-ideleve="<?= (int)$e['id'] ?>"
                       <?= ((int)$e['absent'] === 1) ? 'checked' : '' ?>
                       onclick="event.stopPropagation()">
+
+                <a href="#"
+                  class="js-modal small text-decoration-none"
+                  data-modal="/modals/absences/list?ideleve=<?= (int)$e['id'] ?>&idannee=<?= (int)$seance['idannee'] ?>"
+                  data-modal-size="modal-lg"
+                  onclick="event.preventDefault(); event.stopPropagation();"
+                  title="Voir toutes les absences de l'année">
+                  <span class="badge text-bg-secondary">
+                    Abs: <?= (int)($e['abs_year'] ?? 0) ?>
+                  </span>
+                </a>
               </td>
             </tr>
           <?php endforeach; ?>
