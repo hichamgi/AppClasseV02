@@ -39,22 +39,55 @@
               <th>Nom (FR)</th>
               <th>الاسم (AR)</th>
               <th style="width:90px;">Points</th>
-              <th style="width:120px;">Participation</th>
               <th style="width:110px;">Absent</th>
             </tr>
           </thead>
           <tbody>
           <?php foreach ($eleves as $e): ?>
-            <?php $prevAbsent = ((int)($e['prev_absent'] ?? 0) === 1); ?>
-            <tr class="<?= $prevAbsent ? 'table-danger' : '' ?>"
-                style="cursor:pointer"
-                data-modal="/modals/eleves/show?ideleve=<?= (int)$e['id'] ?>&idclasse=<?= (int)$seance['idclasse'] ?>&idannee=<?= (int)$seance['idannee'] ?>"
-                data-modal-size="modal-xl">
+            <?php
+              $prevAbsent = ((int)($e['prev_absent'] ?? 0) === 1);
+              $modalUrl = "/modals/eleves/show?ideleve=".(int)$e['id']
+                        . "&idclasse=".(int)$seance['idclasse']
+                        . "&idannee=".(int)$seance['idannee'];
+            ?>
+            <tr class="<?= $prevAbsent ? 'table-danger' : '' ?>">
               <td><?= (int)$e['numero'] ?></td>
-              <td><?= htmlspecialchars($e['nom'].' '.$e['prenom'], ENT_QUOTES, 'UTF-8') ?></td>
-              <td dir="rtl"><?= htmlspecialchars(($e['nomar'] ?? '').' '.($e['prenomar'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-              <td><?= (int)$e['points'] ?></td>
-              <td><?= (int)$e['participation'] ?></td>
+
+              <td>
+                <a href="#"
+                  class="text-decoration-none fw-semibold js-modal"
+                  data-modal="<?= htmlspecialchars($modalUrl, ENT_QUOTES, 'UTF-8') ?>"
+                  data-modal-size="modal-xl">
+                  <?= htmlspecialchars(($e['nom'] ?? '').' '.($e['prenom'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                </a>
+              </td>
+
+              <td dir="rtl">
+                <a href="#"
+                  class="text-decoration-none js-modal"
+                  data-modal="<?= htmlspecialchars($modalUrl, ENT_QUOTES, 'UTF-8') ?>"
+                  data-modal-size="modal-xl">
+                  <?= htmlspecialchars(($e['nomar'] ?? '').' '.($e['prenomar'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                </a>
+              </td>
+
+              <td class="text-nowrap">
+                <button type="button"
+                        class="btn btn-sm btn-outline-secondary"
+                        onclick="event.stopPropagation(); AppClassePoints.bump(<?= (int)$seance['id'] ?>, <?= (int)$e['id'] ?>, -1)">
+                  <i class="bi bi-dash"></i>
+                </button>
+
+                <span id="pts-<?= (int)$e['id'] ?>" class="mx-2 fw-semibold">
+                  <?= (int)$e['points'] ?>
+                </span>
+
+                <button type="button"
+                        class="btn btn-sm btn-outline-secondary"
+                        onclick="event.stopPropagation(); AppClassePoints.bump(<?= (int)$seance['id'] ?>, <?= (int)$e['id'] ?>, +1)">
+                  <i class="bi bi-plus"></i>
+                </button>
+              </td>
               <td>
                 <input type="checkbox"
                       class="form-check-input js-abs"

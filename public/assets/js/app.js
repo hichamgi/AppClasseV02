@@ -43,7 +43,6 @@
   }
 
   async function postForm(url, formData) {
-    // formData: instance of FormData
     const res = await fetch(baseUrl() + url, {
       method: 'POST',
       headers: {
@@ -68,66 +67,6 @@
   }
 
   // -----------------------
-  // Modal Manager (HTML modals)
-  // -----------------------
-  window.ModalManager = (function () {
-    let bsModal = null;
-
-    async function open(url, opts = {}) {
-      const modalEl = document.getElementById('appModal');
-      const contentEl = document.getElementById('appModalContent');
-      if (!modalEl || !contentEl) throw new Error('ModalHost #appModal introuvable');
-
-      const dialog = modalEl.querySelector('.modal-dialog');
-      if (!dialog) throw new Error('Modal dialog introuvable');
-
-      dialog.classList.remove('modal-sm', 'modal-lg', 'modal-xl');
-      dialog.classList.add(opts.size || 'modal-lg');
-
-      if (!bsModal) bsModal = new bootstrap.Modal(modalEl);
-
-      contentEl.innerHTML = `
-        <div class="modal-header">
-          <h5 class="modal-title">Chargement...</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
-        </div>
-        <div class="modal-body"><div class="text-muted">Veuillez patienter.</div></div>
-      `;
-      bsModal.show();
-
-      const res = await fetch(baseUrl() + url, {
-        headers: { 'X-Requested-With': 'fetch' }
-      });
-      const html = await res.text();
-
-      if (!res.ok) throw new Error('Erreur chargement modal (' + res.status + '): ' + html.slice(0, 120));
-      contentEl.innerHTML = html;
-
-      // Auto-bind AJAX forms inside modal (data-ajax="1")
-      bindAjaxForms(contentEl);
-    }
-
-    return { open };
-  })();
-
-  // -----------------------
-  // Global [data-modal] handler
-  // -----------------------
-  document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-modal]');
-    if (!el) return;
-
-    e.preventDefault();
-
-    const url = el.getAttribute('data-modal');
-    const size = el.getAttribute('data-modal-size') || 'modal-lg';
-    if (!url) return;
-
-    window.ModalManager.open(url, { size })
-      .catch(err => alert('Modal error: ' + err.message));
-  });
-
-  // -----------------------
   // AJAX forms (data-ajax="1") => POST + JSON response
   // -----------------------
   function bindAjaxForms(rootEl) {
@@ -144,14 +83,16 @@
         const fd = new FormData(form);
 
         try {
-          const data = await postForm(action.replace(baseUrl(), ''), fd);
+          const relative = action.startsWith(baseUrl()) ? action.slice(baseUrl().length) : action;
+          const data = await postForm(relative, fd);
 
-          // Convention: { ok:true, refresh:true } => reload
           if (data.refresh) {
             window.location.reload();
             return;
           }
-          alert('OK');
+
+          // optionnel: tu peux afficher un toast ici plus tard
+          console.log('OK');
         } catch (err) {
           alert('Erreur: ' + (err.message || err));
         }
@@ -161,6 +102,80 @@
 
   // Bind initial page (in case there are ajax forms outside modal)
   bindAjaxForms(document);
+
+  // -----------------------
+  // Modal Manager (HTML modals)
+  // -----------------------
+  window.ModalManager = (function () {
+    let bsModal = null;
+
+    async function open(url, opts = {}) {
+      const modalEl = document.getElementById('appModal');
+      const contentEl = document.getElementById('appModalContent');
+      if (!modalEl || !contentEl) throw new Error('ModalHost #appModal introuvable');
+
+      const dialog = modalEl.querySelector('.modal-dialog');
+      if (!dialog) throw new Error('Modal dialog introuvable');
+
+      // Taille
+      dialog.classList.remove('modal-sm', 'modal-lg', 'modal-xl');
+      dialog.classList.add(opts.size || 'modal-lg');
+
+      // Instance bootstrap
+      bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+      // Skeleton
+      contentEl.innerHTML = `
+        <div class="modal-header">
+          <h5 class="modal-title">Chargement...</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body"><div class="text-muted">Veuillez patienter.</div></div>
+      `;
+      bsModal.show();
+
+      const fullUrl = url.startsWith('http') ? url : (baseUrl() + url);
+      const res = await fetch(fullUrl, {
+        headers: { 'X-Requested-With': 'fetch' }
+      });
+      const html = await res.text();
+
+      if (!res.ok) {
+        throw new Error('Erreur chargement modal (' + res.status + ')');
+      }
+
+      contentEl.innerHTML = html;
+
+      // Auto-bind AJAX forms inside modal
+      bindAjaxForms(contentEl);
+    }
+
+    return { open };
+  })();
+
+  // -----------------------
+  // Global [data-modal] handler (ONE handler only)
+  // -----------------------
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-modal]');
+    if (!el) return;
+
+    // Ne pas ouvrir de modal si on clique sur des contrôles
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'BUTTON' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.tagName === 'LABEL')) {
+      return;
+    }
+
+    e.preventDefault();
+
+    const url = el.getAttribute('data-modal');
+    if (!url) return;
+
+    const size = el.getAttribute('data-modal-size') || 'modal-lg';
+
+    window.ModalManager.open(url, { size })
+      .catch(err => alert('Modal error: ' + err.message));
+  });
 
   // -----------------------
   // Existing AppClasse actions
@@ -190,16 +205,31 @@
 
     async detachPartie(payload) {
       return await postJson('/api/seances/partie/delete', payload);
-    }
+    },
 
+    async updatePoints(payload) {
+      return await postJson('/api/points/update', payload);
+    }
   };
 
   // -----------------------
-  // Timetable (global) - Click logic
-  // Requirements on HTML:
-  // - <th class="day-header" data-weekday="1..6">...</th>
-  // - <tr data-heured="08:00">...</tr>
-  // - <td data-weekday="X">...<a class="class-click" data-classe-id="..">Classe</a></td>
+  // AppClassePoints helper
+  // -----------------------
+  window.AppClassePoints = {
+    async bump(idseance, ideleve, delta) {
+      try {
+        const data = await window.AppClasse.updatePoints({ idseance, ideleve, delta });
+        const el = document.getElementById('pts-' + ideleve);
+        if (el) el.textContent = data.points;
+      } catch (e) {
+        console.error(e);
+        alert(e.message);
+      }
+    }
+  };
+
+  // -----------------------
+  // Timetable helpers
   // -----------------------
   function isoDate(d) { return d.toISOString().slice(0, 10); }
   function weekdayNow() { const x = (new Date()).getDay(); return x === 0 ? 7 : x; } // 1..7
@@ -228,7 +258,6 @@
       });
     });
 
-    // de-duplicate
     const m = new Map();
     sessions.forEach(s => m.set(`${s.classe_id}|${s.heured}`, s));
     return Array.from(m.values());
@@ -240,7 +269,9 @@
       .catch(err => alert('Modal error: ' + err.message));
   }
 
-  // Bulk confirmation modal (lightweight). Uses a static host in layout.
+  // -----------------------
+  // Bulk confirmation modal (optional host)
+  // -----------------------
   const Bulk = (function () {
     let bs = null;
     let payload = null;
@@ -248,32 +279,8 @@
     function ensureHost() {
       const el = document.getElementById('bulkSeancesModal');
       if (!el) return null;
-      if (!bs) bs = new bootstrap.Modal(el);
+      bs = bootstrap.Modal.getOrCreateInstance(el);
       return el;
-    }
-
-    function show(date, sessions) {
-      const host = ensureHost();
-      if (!host) {
-        // fallback: confirm()
-        const ok = confirm(`Créer ${sessions.length} séance(s) pour le ${date} ?`);
-        if (!ok) return;
-        return confirmCreate(date, sessions);
-      }
-
-      payload = { date, sessions };
-
-      host.querySelector('#bulkDate').textContent = date;
-
-      const tbody = host.querySelector('#bulkRows');
-      tbody.innerHTML = '';
-      sessions.forEach(s => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${escapeHtml(s.classe_label)}</td><td>${escapeHtml(s.heured)}</td><td class="text-muted">—</td>`;
-        tbody.appendChild(tr);
-      });
-
-      bs.show();
     }
 
     async function confirmCreate(date, sessions) {
@@ -282,7 +289,6 @@
         sessions: sessions.map(s => ({ classe_id: s.classe_id, heured: s.heured }))
       });
 
-      // If we have the modal rows, paint results
       const host = document.getElementById('bulkSeancesModal');
       if (host) {
         const rows = host.querySelectorAll('#bulkRows tr');
@@ -301,6 +307,29 @@
 
       if (data.refresh) window.location.reload();
       return data;
+    }
+
+    function show(date, sessions) {
+      const host = ensureHost();
+      if (!host) {
+        const ok = confirm(`Créer ${sessions.length} séance(s) pour le ${date} ?`);
+        if (!ok) return;
+        return confirmCreate(date, sessions);
+      }
+
+      payload = { date, sessions };
+
+      host.querySelector('#bulkDate').textContent = date;
+
+      const tbody = host.querySelector('#bulkRows');
+      tbody.innerHTML = '';
+      sessions.forEach(s => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${escapeHtml(s.classe_label)}</td><td>${escapeHtml(s.heured)}</td><td class="text-muted">—</td>`;
+        tbody.appendChild(tr);
+      });
+
+      bs.show();
     }
 
     function bind() {
@@ -330,7 +359,7 @@
 
   Bulk.bind();
 
-  // Click class => open "Nouvelle séance" with date today + heured from row
+  // Click class => open "Nouvelle séance"
   document.addEventListener('click', (e) => {
     const a = e.target.closest('.class-click');
     if (!a) return;
@@ -340,8 +369,9 @@
     const tr = a.closest('tr');
     const heured = tr?.dataset?.heured || '';
     const idclasse = parseInt(a.dataset.classeId, 10);
-    const date = isoDate(new Date());
+    if (!idclasse || !heured) return;
 
+    const date = isoDate(new Date());
     openNewSeanceModal(idclasse, date, heured);
   });
 
@@ -351,6 +381,8 @@
     if (!th) return;
 
     const weekday = parseInt(th.dataset.weekday, 10);
+    if (!weekday) return;
+
     const date = nextDateForWeekday(weekday);
     const sessions = collectDaySessions(weekday);
 
