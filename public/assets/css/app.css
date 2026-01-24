@@ -29,17 +29,9 @@
   cursor: pointer;
 }
 
-
-
 /* Version arabe (RTL) */
 .table td[dir="rtl"] a.js-modal {
   font-weight: 500;
-}
-
-.table a.js-modal:hover {
-  background: rgba(13,110,253,.08);
-  border-radius: .25rem;
-  padding: 0 .25rem;
 }
 
 a.abs-link {
