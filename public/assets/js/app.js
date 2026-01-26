@@ -394,4 +394,111 @@
     Bulk.show(date, sessions);
   });
 
+  document.addEventListener('click', async (e) => {
+    const btnCreate = e.target.closest('#btnTagCreate');
+    if (btnCreate) {
+      e.preventDefault();
+
+      const labelEl = document.getElementById('tagNewLabel');
+      const colorEl = document.getElementById('tagNewColor');
+      const err = document.getElementById('tagErr');
+      const ok = document.getElementById('tagOk');
+
+      const tag = (labelEl?.value || '').trim();
+      const color = (colorEl?.value || 'secondary').trim();
+
+      err.classList.add('d-none');
+      ok.classList.add('d-none');
+
+      if (!tag) {
+        err.textContent = 'Le tag est vide.';
+        err.classList.remove('d-none');
+        return;
+      }
+
+      const res = await fetch(`${AppClasse.baseUrl}/api/tags/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': AppClasse.csrfToken
+        },
+        body: JSON.stringify({ tag, color })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        err.textContent = data.error || 'Erreur lors de la création du tag.';
+        err.classList.remove('d-none');
+        return;
+      }
+
+      // Ajouter dans la liste + cocher
+      const list = document.getElementById('tagsList');
+      if (list) {
+        const id = Number(data.id);
+        const safeTag = data.tag;     // affiché en textContent (safe)
+        const safeColor = data.color;
+
+        const label = document.createElement('label');
+        label.className = 'd-flex align-items-center gap-2';
+
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.className = 'form-check-input js-tag-check';
+        input.value = String(id);
+        input.checked = true;
+
+        const badge = document.createElement('span');
+        badge.className = `badge text-bg-${safeColor || 'secondary'}`;
+        badge.textContent = safeTag;
+
+        label.appendChild(input);
+        label.appendChild(badge);
+        list.appendChild(label);
+      }
+
+      labelEl.value = '';
+      ok.textContent = 'Tag créé.';
+      ok.classList.remove('d-none');
+      return;
+    }
+
+    const btnSave = e.target.closest('#btnTagSave');
+    if (btnSave) {
+      e.preventDefault();
+
+      const ideleve = Number(btnSave.dataset.ideleve);
+      const err = document.getElementById('tagErr');
+      const ok = document.getElementById('tagOk');
+
+      err.classList.add('d-none');
+      ok.classList.add('d-none');
+
+      const tagIds = [...document.querySelectorAll('.js-tag-check:checked')]
+        .map(x => Number(x.value))
+        .filter(Number.isFinite);
+
+      const res = await fetch(`${AppClasse.baseUrl}/api/eleves/tags/update`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': AppClasse.csrfToken
+        },
+        body: JSON.stringify({ ideleve, tag_ids: tagIds })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        err.textContent = data.error || 'Erreur lors de l’enregistrement.';
+        err.classList.remove('d-none');
+        return;
+      }
+
+      ok.textContent = 'Tags enregistrés.';
+      ok.classList.remove('d-none');
+
+      // Option: fermer la modal après 500ms
+      // ModalManager.close();
+    }
+  });
 })();

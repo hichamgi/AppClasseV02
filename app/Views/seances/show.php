@@ -1,7 +1,7 @@
 <h1 class="h4 mb-3">
-  Séance — <?= htmlspecialchars($seance['classe'], ENT_QUOTES, 'UTF-8') ?>
+  Séance — <?= $this->e($seance['classe']) ?>
   <span class="text-muted">
-    (<?= htmlspecialchars($seance['date'], ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars($seance['heured'], ENT_QUOTES, 'UTF-8') ?>)
+    (<?= $this->e($seance['date']) ?>, <?= $this->e($seance['heured']) ?>)
   </span>
 </h1>
 
@@ -16,6 +16,7 @@
               <th style="width:70px;">N°</th>
               <th>Nom (FR)</th>
               <th>الاسم (AR)</th>
+              <th></th>
               <th style="width:90px;">Points</th>
               <th style="width:110px;">Absent</th>
             </tr>
@@ -34,7 +35,7 @@
                     data-modal="/modals/eleves/show?ideleve=<?= (int)$e['id'] ?>&idclasse=<?= (int)$seance['idclasse'] ?>&idannee=<?= (int)$seance['idannee'] ?>"
                     data-modal-size="modal-xl"
                     onclick="event.preventDefault();">
-                    <?= htmlspecialchars($e['nom'].' '.$e['prenom'], ENT_QUOTES, 'UTF-8') ?>
+                    <?= $this->e($e['nom'].' '.$e['prenom']) ?>
                   </a>
                 </td>
 
@@ -45,8 +46,17 @@
                     data-modal="/modals/eleves/show?ideleve=<?= (int)$e['id'] ?>&idclasse=<?= (int)$seance['idclasse'] ?>&idannee=<?= (int)$seance['idannee'] ?>"
                     data-modal-size="modal-xl"
                     onclick="event.preventDefault();">
-                    <?= htmlspecialchars(($e['nomar'] ?? '').' '.($e['prenomar'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                    <?= $this->e(($e['nomar'] ?? '').' '.($e['prenomar'] ?? '')) ?>
                   </a>
+                </td>
+                <td>
+                  <button
+                    class="btn btn-sm btn-outline-secondary"
+                    data-modal="<?= $this->e($baseUrl . '/modals/eleves/tags?ideleve=' . (int)$e['id']) ?>"
+                    data-size="lg"
+                  >
+                    Tags
+                  </button>
                 </td>
 
                 <!-- Points -->
@@ -117,8 +127,8 @@
               ?>
               <tr class="<?= $linked ? 'table-success' : ($devoir === 1 ? 'table-danger' : '') ?>">
                 <?php if ($niv>1): ?>
-                  <td><?= htmlspecialchars(($p['num'] ? $p['num'].' - ' : '').$p['partie'], ENT_QUOTES, 'UTF-8') ?></td>
-                  <td><?= $done ? htmlspecialchars($p['last_date'], ENT_QUOTES, 'UTF-8') : '<span class="text-muted">—</span>' ?></td>
+                  <td><?= $this->e(($p['num'] ? $p['num'].' - ' : '').$p['partie']) ?></td>
+                  <td><?= $done ? $this->e($p['last_date']) : '<span class="text-muted">—</span>' ?></td>
                   <td class="text-end">
                       <?php if ($linked): ?>
                           <button class="btn btn-sm btn-outline-danger js-del-partie"
@@ -139,8 +149,10 @@
                   </td>
                 <?php else: ?>
                   <td colspan="3">
-                    <div class="small text-muted"><?= htmlspecialchars($p['abrev'].'-'.$p['module'], ENT_QUOTES, 'UTF-8') ?></div>
-                    <?= htmlspecialchars($p['partie'], ENT_QUOTES, 'UTF-8') ?>
+                    <?php if($devoir === 0): ?>
+                      <div class="text-muted"><?= $this->e($p['abrev'].' - '.$p['module']) ?></div>
+                    <?php endif; ?>
+                    <?= $this->e($p['partie'])?>
                   </td>
                 <?php endif; ?>
               </tr>
@@ -158,14 +170,14 @@
       <div>
         <div class="fw-semibold">Observation</div>
         <div id="obsText" class="<?= empty($seance['observation']) ? 'text-muted' : '' ?>">
-          <?= empty($seance['observation']) ? '—' : htmlspecialchars($seance['observation'], ENT_QUOTES, 'UTF-8') ?>
+          <?= empty($seance['observation']) ? '—' : $this->e($seance['observation']) ?>
         </div>
       </div>
       <button class="btn btn-sm btn-outline-secondary" id="btnEditObs">Modifier</button>
     </div>
 
     <div class="mt-3 d-none" id="obsEdit">
-      <textarea class="form-control" id="obsInput" rows="3"><?= htmlspecialchars((string)($seance['observation'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
+      <textarea class="form-control" id="obsInput" rows="3"><?= $this->e((string)($seance['observation'] ?? '')) ?></textarea>
       <div class="mt-2 d-flex gap-2">
         <button class="btn btn-sm btn-primary" id="btnSaveObs">Enregistrer</button>
         <button class="btn btn-sm btn-outline-secondary" id="btnCancelObs">Annuler</button>

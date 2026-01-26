@@ -9,7 +9,7 @@
           <div class="alert alert-danger"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
         <?php endif; ?>
 
-        <form method="post" action="<?= $baseUrl ?>/login">
+        <form method="post" action="<?= $this->e($baseUrl . '/login') ?>">
           <?= $this->csrfField() ?>
           <div class="mb-3">
             <label class="form-label">Utilisateur</label>

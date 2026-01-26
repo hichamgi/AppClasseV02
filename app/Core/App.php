@@ -75,6 +75,7 @@ class App
         $this->router->post('/api/seances/create-bulk', 'App\\Controllers\\Api\\SeancesApiController@createBulk', [AuthMiddleware::class]);
         $this->router->post('/api/eleves/tags', 'App\\Controllers\\Api\\ElevesApiController@setTags', [AuthMiddleware::class]);
         $this->router->post('/api/points/update', 'App\\Controllers\\Api\\ElevesApiController@updatePoints', [AuthMiddleware::class]);
+        $this->router->post('/api/tags/create', 'App\\Controllers\\Api\\ElevesApiController@createTag', [AuthMiddleware::class]);
 
 
         // Exemple route admin (si tu en as besoin plus tard)

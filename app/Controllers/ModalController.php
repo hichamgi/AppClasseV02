@@ -167,26 +167,45 @@ class ModalController extends Controller
 
         $pdo = Database::pdo();
 
-        $st = $pdo->prepare("SELECT id, nom, prenom FROM eleves WHERE id=:id AND deleted_at IS NULL LIMIT 1");
+        // 1) Élève (soft delete respecté)
+        $st = $pdo->prepare("
+            SELECT id, nom, prenom
+            FROM eleves
+            WHERE id = :id AND deleted_at IS NULL
+            LIMIT 1
+        ");
         $st->execute(['id' => $ideleve]);
-        $eleve = $st->fetch();
+        $eleve = $st->fetch(\PDO::FETCH_ASSOC);
+
         if (!$eleve) {
             http_response_code(404);
             echo "Élève introuvable";
             return;
         }
 
-        $tags = $pdo->query("SELECT id, tag, color FROM tags ORDER BY tag")->fetchAll();
+        // 2) Tous les tags (catalogue)
+        $st = $pdo->query("SELECT id, tag, color FROM tags ORDER BY tag");
+        $tags = $st->fetchAll(\PDO::FETCH_ASSOC);
 
+        // 3) Tags sélectionnés pour cet élève
         $st = $pdo->prepare("SELECT idtag FROM eleves_tags WHERE ideleve = :id");
         $st->execute(['id' => $ideleve]);
-        $selected = array_map('intval', array_column($st->fetchAll(), 'idtag'));
+
+        $selectedIds = array_map('intval', array_column($st->fetchAll(\PDO::FETCH_ASSOC), 'idtag'));
+
+        // Map pour lookup rapide côté vue : isset($selectedMap[$idtag])
+        $selectedMap = [];
+        foreach ($selectedIds as $tid) {
+            $selectedMap[$tid] = true;
+        }
 
         $this->view('modals/eleves_tags', [
-            'baseUrl' => $this->baseUrl(),
-            'eleve' => $eleve,
-            'tags' => $tags,
-            'selected' => $selected,
+            'baseUrl'      => $this->baseUrl(),
+            'eleve'        => $eleve,
+            'tags'         => $tags,
+            'selectedIds'  => $selectedIds,   // optionnel si tu veux garder
+            'selectedMap'  => $selectedMap,   // recommandé pour la vue
+            'csrfField'    => $this->csrfField(), // utile si tu veux l’inclure dans la modal
         ], layout: null);
     }
 
@@ -433,7 +452,6 @@ class ModalController extends Controller
             'idannee' => $idannee,
         ], 'modal');
     }
-
 
     private function buildParentReportPrompt(array $byYear, array $absenceStats, array $tags, int $currentYearId, int $currentClasseId, string $notesBlock): string
     {

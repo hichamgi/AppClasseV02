@@ -142,4 +142,75 @@ class ElevesApiController extends Controller
         }
     }
 
+    public function updateTags(): void
+    {
+        $this->requireCsrf();
+
+        $data = $this->inputJson();
+        $ideleve = (int)($data['ideleve'] ?? 0);
+        $tagIds = $data['tag_ids'] ?? [];
+
+        if ($ideleve <= 0 || !is_array($tagIds)) {
+            $this->json(['ok' => false, 'error' => 'Bad payload'], 400);
+        }
+
+        // normaliser ids
+        $tagIds = array_values(array_unique(array_filter(array_map('intval', $tagIds), fn($x) => $x > 0)));
+
+        $db = App::db();
+
+        // transaction
+        $db->beginTransaction();
+        try {
+            $db->execute("DELETE FROM eleves_tags WHERE ideleve = :ideleve", ['ideleve' => $ideleve]);
+
+            if (!empty($tagIds)) {
+                $stmt = $db->prepare("INSERT INTO eleves_tags (idtag, ideleve) VALUES (:idtag, :ideleve)");
+                foreach ($tagIds as $idtag) {
+                    $stmt->execute(['idtag' => $idtag, 'ideleve' => $ideleve]);
+                }
+            }
+
+            $db->commit();
+            $this->json(['ok' => true]);
+        } catch (\Throwable $e) {
+            $db->rollBack();
+            $this->json(['ok' => false, 'error' => 'DB error'], 500);
+        }
+    }
+
+    public function createTag(): void
+    {
+        $this->requireCsrf();
+
+        $data = $this->inputJson();
+        $tag = trim((string)($data['tag'] ?? ''));
+        $color = trim((string)($data['color'] ?? 'secondary'));
+
+        if ($tag === '') {
+            $this->json(['ok' => false, 'error' => 'Tag vide'], 400);
+        }
+
+        // whitelist couleurs bootstrap
+        $allowed = ['secondary','primary','success','warning','danger','info','dark'];
+        if (!in_array($color, $allowed, true)) {
+            $color = 'secondary';
+        }
+
+        $db = App::db();
+
+        try {
+            $db->execute(
+                "INSERT INTO tags (tag, color) VALUES (:tag, :color)",
+                ['tag' => $tag, 'color' => $color]
+            );
+            $id = (int)$db->lastInsertId();
+            $this->json(['ok' => true, 'id' => $id, 'tag' => $tag, 'color' => $color], 201);
+        } catch (\Throwable $e) {
+            // doublon (unique tag)
+            $this->json(['ok' => false, 'error' => 'Tag existe déjà'], 409);
+        }
+    }
+
+
 }

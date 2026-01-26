@@ -56,7 +56,17 @@ class Controller
 
     protected function e(?string $s): string
     {
-        return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+        if ($s === null || $s === '') {
+            return '';
+        }
+
+        // 1) Décoder les entités HTML (si la chaîne en contient)
+        if (strpos($s, '&') !== false) {
+            $s = html_entity_decode($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
+        // 2) Escape XSS
+        return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     protected function csrfField(): string
