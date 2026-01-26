@@ -167,13 +167,7 @@ class ModalController extends Controller
 
         $pdo = Database::pdo();
 
-        // 1) Élève (soft delete respecté)
-        $st = $pdo->prepare("
-            SELECT id, nom, prenom
-            FROM eleves
-            WHERE id = :id AND deleted_at IS NULL
-            LIMIT 1
-        ");
+        $st = $pdo->prepare("SELECT id, nom, prenom FROM eleves WHERE id=:id AND deleted_at IS NULL LIMIT 1");
         $st->execute(['id' => $ideleve]);
         $eleve = $st->fetch(\PDO::FETCH_ASSOC);
 
@@ -183,31 +177,40 @@ class ModalController extends Controller
             return;
         }
 
-        // 2) Tous les tags (catalogue)
+        // IMPORTANT: fetch assoc
         $st = $pdo->query("SELECT id, tag, color FROM tags ORDER BY tag");
         $tags = $st->fetchAll(\PDO::FETCH_ASSOC);
 
-        // 3) Tags sélectionnés pour cet élève
         $st = $pdo->prepare("SELECT idtag FROM eleves_tags WHERE ideleve = :id");
         $st->execute(['id' => $ideleve]);
+        $selected = array_map('intval', array_column($st->fetchAll(\PDO::FETCH_ASSOC), 'idtag'));
 
-        $selectedIds = array_map('intval', array_column($st->fetchAll(\PDO::FETCH_ASSOC), 'idtag'));
-
-        // Map pour lookup rapide côté vue : isset($selectedMap[$idtag])
         $selectedMap = [];
-        foreach ($selectedIds as $tid) {
-            $selectedMap[$tid] = true;
+        foreach ($selected as $idtag) {
+            $selectedMap[$idtag] = true;
         }
 
         $this->view('modals/eleves_tags', [
-            'baseUrl'      => $this->baseUrl(),
-            'eleve'        => $eleve,
-            'tags'         => $tags,
-            'selectedIds'  => $selectedIds,   // optionnel si tu veux garder
-            'selectedMap'  => $selectedMap,   // recommandé pour la vue
-            'csrfField'    => $this->csrfField(), // utile si tu veux l’inclure dans la modal
+            'baseUrl'     => $this->baseUrl(),
+            'eleve'       => $eleve,
+
+            // compat: si ta vue attend $tags
+            'tags'        => $tags,
+
+            // compat: si ta vue attend $allTags
+            'allTags'     => $tags,
+
+            // compat: si ta vue attend $selected (liste)
+            'selected'    => $selected,
+
+            // compat: si ta vue attend $selectedMap
+            'selectedMap' => $selectedMap,
+
+            // utile pour JS fetch + CSRF
+            'csrfToken'   => \App\Core\Csrf::token(),
         ], layout: null);
     }
+
 
     public function eleveShow(): void
     {

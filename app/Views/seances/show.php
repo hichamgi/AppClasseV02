@@ -50,13 +50,13 @@
                   </a>
                 </td>
                 <td>
-                  <button
-                    class="btn btn-sm btn-outline-secondary"
-                    data-modal="<?= $this->e($baseUrl . '/modals/eleves/tags?ideleve=' . (int)$e['id']) ?>"
-                    data-size="lg"
-                  >
+                  <a class="btn btn-sm btn-outline-secondary"
+                    href="/modals/eleves/tags?ideleve=<?= (int)$e['id'] ?>"
+                    data-modal='/modals/eleves/tags?ideleve=<?= (int)$e['id'] ?>'
+                    data-size="lg">
                     Tags
-                  </button>
+                  </a>
+
                 </td>
 
                 <!-- Points -->

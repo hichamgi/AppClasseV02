@@ -2,7 +2,7 @@
 
 <div class="modal-header">
   <h5 class="modal-title">
-    Tags — <?= $this->e_decode(trim(($eleve['nom'] ?? '').' '.($eleve['prenom'] ?? ''))) ?>
+    Tags — <?= $this->e(trim(($eleve['nom'] ?? '').' '.($eleve['prenom'] ?? ''))) ?>
   </h5>
   <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
 </div>
@@ -22,7 +22,7 @@
             <input class="form-check-input js-tag-check" type="checkbox"
                    value="<?= $tid ?>" <?= $checked ? 'checked' : '' ?>>
             <span class="badge text-bg-<?= $this->e($t['color'] ?: 'secondary') ?>">
-              <?= $this->e_decode($t['tag']) ?>
+              <?= $this->e($t['tag']) ?>
             </span>
           </label>
         <?php endforeach; ?>

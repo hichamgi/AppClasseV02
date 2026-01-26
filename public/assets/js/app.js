@@ -416,14 +416,16 @@
         return;
       }
 
-      const res = await fetch(`${AppClasse.baseUrl}/api/tags/create`, {
+      const res = await fetch(baseUrl() + '/api/tags/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRF-Token': AppClasse.csrfToken
+          'X-CSRF-Token': csrf(),
+          'X-Requested-With': 'fetch'
         },
         body: JSON.stringify({ tag, color })
       });
+
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
@@ -478,14 +480,16 @@
         .map(x => Number(x.value))
         .filter(Number.isFinite);
 
-      const res = await fetch(`${AppClasse.baseUrl}/api/eleves/tags/update`, {
+      const res = await fetch(baseUrl() + '/api/eleves/tags', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRF-Token': AppClasse.csrfToken
+          'X-CSRF-Token': csrf(),
+          'X-Requested-With': 'fetch'
         },
-        body: JSON.stringify({ ideleve, tag_ids: tagIds })
+        body: JSON.stringify({ ideleve, tags: tagIds })
       });
+
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
