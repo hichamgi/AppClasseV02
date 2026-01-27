@@ -52,24 +52,36 @@
     </div>
 
     <div class="col-12">
-      <div class="fw-semibold mb-1">Tags</div>
+      <?php $ideleve = (int)($eleve['id'] ?? 0); ?>
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <div class="fw-semibold">Tags</div>
+        <a class="btn btn-sm btn-outline-secondary"
+          href="/modals/eleves/tags?ideleve=<?= $ideleve ?>"
+          data-modal="/modals/eleves/tags?ideleve=<?= $ideleve ?>"
+          data-modal-size="modal-lg">
+          Tags
+        </a>
+      </div>
       <?php if (empty($tags)): ?>
         <div class="text-muted">—</div>
       <?php else: ?>
         <div class="d-flex flex-wrap gap-2">
           <?php foreach ($tags as $t): ?>
             <?php
-              $color = (string)($t['color'] ?? '#6c757d');
+              $color = (string)($t['color'] ?? 'secondary'); // ex: danger, warning...
               $tag   = (string)($t['tag'] ?? '');
+              // sécurité: whitelist bootstrap
+              $allowed = ['secondary','primary','success','warning','danger','info','dark'];
+              if (!in_array($color, $allowed, true)) $color = 'secondary';
             ?>
-            <span class="badge"
-                  style="background:<?= htmlspecialchars($color, ENT_QUOTES, 'UTF-8') ?>;">
-              <?= htmlspecialchars($tag, ENT_QUOTES, 'UTF-8') ?>
+            <span class="badge text-bg-<?= $this->e($color) ?>">
+              <?= $this->e($tag) ?>
             </span>
           <?php endforeach; ?>
         </div>
       <?php endif; ?>
     </div>
+
 
     <div class="col-12">
       <div class="fw-semibold mb-2">Dossiers par année</div>

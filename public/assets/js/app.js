@@ -2,75 +2,61 @@
   'use strict';
 
   // -----------------------
-  // Meta helpers
+  // Meta + config
   // -----------------------
-  function meta(name) {
-    return document.querySelector(`meta[name="${name}"]`);
-  }
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-  function csrf() {
-    const m = meta('csrf-token');
-    return m ? (m.getAttribute('content') || '') : '';
-  }
+  const meta = (name) => $(`meta[name="${name}"]`);
 
-  function baseUrl() {
-    const m = meta('base-url');
-    let b = m ? (m.getAttribute('content') || '') : '';
+  const csrf = () => meta('csrf-token')?.getAttribute('content') || '';
+
+  const baseUrl = () => {
+    let b = meta('base-url')?.getAttribute('content') || '';
     if (b.length > 1 && b.endsWith('/')) b = b.slice(0, -1);
     return b;
-  }
+  };
+
+  const escapeHtml = (s) =>
+    String(s ?? '').replace(/[&<>"']/g, (m) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[m]));
 
   // -----------------------
   // HTTP helpers
   // -----------------------
-  async function postJson(url, body) {
+  async function requestJson(url, { method = 'POST', headers = {}, body } = {}) {
     const res = await fetch(baseUrl() + url, {
-      method: 'POST',
+      method,
       headers: {
-        'Content-Type': 'application/json',
         'X-CSRF-TOKEN': csrf(),
-        'X-Requested-With': 'fetch'
+        'X-Requested-With': 'fetch',
+        ...headers
       },
-      body: JSON.stringify(body || {})
+      body
     });
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.ok === false) {
-      const msg = data.error || ('Erreur HTTP ' + res.status);
-      throw new Error(msg);
+      throw new Error(data.error || ('Erreur HTTP ' + res.status));
     }
     return data;
   }
 
-  async function postForm(url, formData) {
-    const res = await fetch(baseUrl() + url, {
-      method: 'POST',
-      headers: {
-        'X-CSRF-TOKEN': csrf(),
-        'X-Requested-With': 'fetch'
-      },
-      body: formData
+  const postJson = (url, obj) =>
+    requestJson(url, {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(obj || {})
     });
 
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.ok === false) {
-      const msg = data.error || ('Erreur HTTP ' + res.status);
-      throw new Error(msg);
-    }
-    return data;
-  }
-
-  function escapeHtml(s) {
-    return String(s ?? '').replace(/[&<>"']/g, m => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[m]));
-  }
+  const postForm = (url, formData) =>
+    requestJson(url, { body: formData });
 
   // -----------------------
-  // AJAX forms (data-ajax="1") => POST + JSON response
+  // AJAX forms (data-ajax="1")
   // -----------------------
   function bindAjaxForms(rootEl) {
-    rootEl.querySelectorAll('form[data-ajax="1"]').forEach(form => {
+    $$('form[data-ajax="1"]', rootEl).forEach((form) => {
       if (form.__ajaxBound) return;
       form.__ajaxBound = true;
 
@@ -80,19 +66,12 @@
         const action = form.getAttribute('action') || '';
         if (!action) return;
 
-        const fd = new FormData(form);
-
         try {
           const relative = action.startsWith(baseUrl()) ? action.slice(baseUrl().length) : action;
-          const data = await postForm(relative, fd);
+          const data = await postForm(relative, new FormData(form));
 
-          if (data.refresh) {
-            window.location.reload();
-            return;
-          }
-
-          // optionnel: tu peux afficher un toast ici plus tard
-          console.log('OK');
+          if (data.refresh) window.location.reload();
+          else console.log('OK');
         } catch (err) {
           alert('Erreur: ' + (err.message || err));
         }
@@ -100,14 +79,15 @@
     });
   }
 
-  // Bind initial page (in case there are ajax forms outside modal)
   bindAjaxForms(document);
 
   // -----------------------
-  // Modal Manager (HTML modals)
+  // Modal Manager (stack stores URL + size)
   // -----------------------
   window.ModalManager = (function () {
     let bsModal = null;
+    let current = null;      // { url, size }
+    const stack = [];        // [{ url, size }, ...]
 
     async function open(url, opts = {}) {
       const modalEl = document.getElementById('appModal');
@@ -117,12 +97,18 @@
       const dialog = modalEl.querySelector('.modal-dialog');
       if (!dialog) throw new Error('Modal dialog introuvable');
 
-      // Taille
-      dialog.classList.remove('modal-sm', 'modal-lg', 'modal-xl');
-      dialog.classList.add(opts.size || 'modal-lg');
+      const size = opts.size || 'modal-lg';
 
-      // Instance bootstrap
+      // Size
+      dialog.classList.remove('modal-sm', 'modal-lg', 'modal-xl');
+      dialog.classList.add(size);
+
+      // Bootstrap instance
       bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+      // History: push previous modal (url+size) if already open
+      if (current) stack.push(current);
+      current = { url, size };
 
       // Skeleton
       contentEl.innerHTML = `
@@ -135,36 +121,65 @@
       bsModal.show();
 
       const fullUrl = url.startsWith('http') ? url : (baseUrl() + url);
-      const res = await fetch(fullUrl, {
-        headers: { 'X-Requested-With': 'fetch' }
-      });
+      const res = await fetch(fullUrl, { headers: { 'X-Requested-With': 'fetch' } });
       const html = await res.text();
 
-      if (!res.ok) {
-        throw new Error('Erreur chargement modal (' + res.status + ')');
-      }
+      if (!res.ok) throw new Error('Erreur chargement modal (' + res.status + ')');
 
       contentEl.innerHTML = html;
 
-      // Auto-bind AJAX forms inside modal
+      // Bind ajax forms inside modal
       bindAjaxForms(contentEl);
     }
 
-    return { open };
+    function canBack() {
+      return stack.length > 0;
+    }
+
+    async function back() {
+      if (!canBack()) return;
+
+      const prev = stack.pop();
+      current = null; // avoid re-push in open()
+
+      await open(prev.url, { size: prev.size });
+    }
+
+    function close() {
+      const modalEl = document.getElementById('appModal');
+      if (!modalEl) return;
+
+      const inst = bootstrap.Modal.getInstance(modalEl) || bsModal;
+      if (inst) inst.hide();
+
+      stack.length = 0;
+      current = null;
+    }
+
+    // If modal is closed manually, reset state (keeps behavior consistent)
+    (function bindHiddenResetOnce() {
+      const modalEl = document.getElementById('appModal');
+      if (!modalEl || modalEl.__mmBound) return;
+      modalEl.__mmBound = true;
+
+      modalEl.addEventListener('hidden.bs.modal', () => {
+        stack.length = 0;
+        current = null;
+      });
+    })();
+
+    return { open, close, back, canBack };
   })();
 
   // -----------------------
-  // Global [data-modal] handler (ONE handler only)
+  // Global [data-modal] handler (one)
   // -----------------------
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-modal]');
     if (!el) return;
 
-    // Ne pas ouvrir de modal si on clique sur des contrôles
     const t = e.target;
-    if (t && (t.tagName === 'INPUT' || t.tagName === 'BUTTON' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.tagName === 'LABEL')) {
-      return;
-    }
+    if (t && /^(INPUT|BUTTON|SELECT|TEXTAREA|LABEL)$/.test(t.tagName)) return;
 
     e.preventDefault();
 
@@ -172,13 +187,11 @@
     if (!url) return;
 
     const size = el.getAttribute('data-modal-size') || 'modal-lg';
-
-    window.ModalManager.open(url, { size })
-      .catch(err => alert('Modal error: ' + err.message));
+    window.ModalManager.open(url, { size }).catch((err) => alert('Modal error: ' + err.message));
   });
 
   // -----------------------
-  // Existing AppClasse actions
+  // AppClasse actions
   // -----------------------
   window.AppClasse = {
     async markAbsence(payload) {
@@ -199,27 +212,24 @@
       }
     },
 
-    async updateObservation(payload) {
-      return await postJson('/api/seances/observation', payload);
+    updateObservation(payload) {
+      return postJson('/api/seances/observation', payload);
     },
 
-    async detachPartie(payload) {
-      return await postJson('/api/seances/partie/delete', payload);
+    detachPartie(payload) {
+      return postJson('/api/seances/partie/delete', payload);
     },
 
-    async updatePoints(payload) {
-      return await postJson('/api/points/update', payload);
+    updatePoints(payload) {
+      return postJson('/api/points/update', payload);
     }
   };
 
-  // -----------------------
-  // AppClassePoints helper
-  // -----------------------
   window.AppClassePoints = {
     async bump(idseance, ideleve, delta) {
       try {
         const data = await window.AppClasse.updatePoints({ idseance, ideleve, delta });
-        const el = document.getElementById('pts-' + ideleve);
+        const el = $('#pts-' + ideleve);
         if (el) el.textContent = data.points;
       } catch (e) {
         console.error(e);
@@ -231,13 +241,15 @@
   // -----------------------
   // Timetable helpers
   // -----------------------
-  function isoDate(d) { return d.toISOString().slice(0, 10); }
-  function weekdayNow() { const x = (new Date()).getDay(); return x === 0 ? 7 : x; } // 1..7
+  const isoDate = (d) => d.toISOString().slice(0, 10);
+  const weekdayNow = () => {
+    const x = new Date().getDay();
+    return x === 0 ? 7 : x; // 1..7
+  };
 
   function nextDateForWeekday(target) {
     const d = new Date();
-    const nowW = weekdayNow();
-    let diff = target - nowW;
+    let diff = target - weekdayNow();
     if (diff < 0) diff += 7;
     const out = new Date(d);
     out.setDate(d.getDate() + diff);
@@ -246,7 +258,7 @@
 
   function collectDaySessions(weekday) {
     const sessions = [];
-    document.querySelectorAll(`td[data-weekday="${weekday}"] .class-click`).forEach(a => {
+    $$(`td[data-weekday="${weekday}"] .class-click`).forEach((a) => {
       const tr = a.closest('tr');
       const heured = tr?.dataset?.heured;
       if (!heured) return;
@@ -259,25 +271,24 @@
     });
 
     const m = new Map();
-    sessions.forEach(s => m.set(`${s.classe_id}|${s.heured}`, s));
+    sessions.forEach((s) => m.set(`${s.classe_id}|${s.heured}`, s));
     return Array.from(m.values());
   }
 
   function openNewSeanceModal(idclasse, date, heured) {
     const url = `/modals/seances/new?idclasse=${idclasse}&date=${encodeURIComponent(date)}&heured=${encodeURIComponent(heured)}`;
-    window.ModalManager.open(url, { size: 'modal-lg' })
-      .catch(err => alert('Modal error: ' + err.message));
+    window.ModalManager.open(url, { size: 'modal-lg' }).catch((err) => alert('Modal error: ' + err.message));
   }
 
   // -----------------------
-  // Bulk confirmation modal (optional host)
+  // Bulk confirmation modal
   // -----------------------
   const Bulk = (function () {
     let bs = null;
     let payload = null;
 
     function ensureHost() {
-      const el = document.getElementById('bulkSeancesModal');
+      const el = $('#bulkSeancesModal');
       if (!el) return null;
       bs = bootstrap.Modal.getOrCreateInstance(el);
       return el;
@@ -286,15 +297,16 @@
     async function confirmCreate(date, sessions) {
       const data = await postJson('/api/seances/create-bulk', {
         date,
-        sessions: sessions.map(s => ({ classe_id: s.classe_id, heured: s.heured }))
+        sessions: sessions.map((s) => ({ classe_id: s.classe_id, heured: s.heured }))
       });
 
-      const host = document.getElementById('bulkSeancesModal');
+      const host = $('#bulkSeancesModal');
       if (host) {
-        const rows = host.querySelectorAll('#bulkRows tr');
+        const rows = $$('#bulkRows tr', host);
         (data.results || []).forEach((r, i) => {
           const td = rows[i]?.children?.[2];
           if (!td) return;
+
           if (r.created) {
             td.textContent = 'Créée';
             td.className = 'text-success';
@@ -312,18 +324,16 @@
     function show(date, sessions) {
       const host = ensureHost();
       if (!host) {
-        const ok = confirm(`Créer ${sessions.length} séance(s) pour le ${date} ?`);
-        if (!ok) return;
+        if (!confirm(`Créer ${sessions.length} séance(s) pour le ${date} ?`)) return;
         return confirmCreate(date, sessions);
       }
 
       payload = { date, sessions };
+      $('#bulkDate', host).textContent = date;
 
-      host.querySelector('#bulkDate').textContent = date;
-
-      const tbody = host.querySelector('#bulkRows');
+      const tbody = $('#bulkRows', host);
       tbody.innerHTML = '';
-      sessions.forEach(s => {
+      sessions.forEach((s) => {
         const tr = document.createElement('tr');
         tr.innerHTML = `<td>${escapeHtml(s.classe_label)}</td><td>${escapeHtml(s.heured)}</td><td class="text-muted">—</td>`;
         tbody.appendChild(tr);
@@ -333,15 +343,15 @@
     }
 
     function bind() {
-      const host = document.getElementById('bulkSeancesModal');
+      const host = $('#bulkSeancesModal');
       if (!host) return;
 
-      const btn = host.querySelector('#bulkConfirm');
+      const btn = $('#bulkConfirm', host);
       if (!btn || btn.__bound) return;
       btn.__bound = true;
 
       btn.addEventListener('click', async () => {
-        if (!payload || !payload.sessions?.length) return;
+        if (!payload?.sessions?.length) return;
 
         btn.disabled = true;
         try {
@@ -359,7 +369,7 @@
 
   Bulk.bind();
 
-  // Click class => open "Nouvelle séance"
+  // Click class => "Nouvelle séance"
   document.addEventListener('click', (e) => {
     const a = e.target.closest('.class-click');
     if (!a) return;
@@ -371,8 +381,7 @@
     const idclasse = parseInt(a.dataset.classeId, 10);
     if (!idclasse || !heured) return;
 
-    const date = isoDate(new Date());
-    openNewSeanceModal(idclasse, date, heured);
+    openNewSeanceModal(idclasse, isoDate(new Date()), heured);
   });
 
   // Click day header => bulk
@@ -394,15 +403,18 @@
     Bulk.show(date, sessions);
   });
 
+  // -----------------------
+  // Tags create/save (close if opened from page, back if opened from another modal)
+  // -----------------------
   document.addEventListener('click', async (e) => {
     const btnCreate = e.target.closest('#btnTagCreate');
     if (btnCreate) {
       e.preventDefault();
 
-      const labelEl = document.getElementById('tagNewLabel');
-      const colorEl = document.getElementById('tagNewColor');
-      const err = document.getElementById('tagErr');
-      const ok = document.getElementById('tagOk');
+      const labelEl = $('#tagNewLabel');
+      const colorEl = $('#tagNewColor');
+      const err = $('#tagErr');
+      const ok = $('#tagOk');
 
       const tag = (labelEl?.value || '').trim();
       const color = (colorEl?.value || 'secondary').trim();
@@ -416,31 +428,16 @@
         return;
       }
 
-      const res = await fetch(baseUrl() + '/api/tags/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': csrf(),
-          'X-Requested-With': 'fetch'
-        },
-        body: JSON.stringify({ tag, color })
-      });
-
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) {
-        err.textContent = data.error || 'Erreur lors de la création du tag.';
+      const data = await postJson('/api/tags/create', { tag, color }).catch((ex) => {
+        err.textContent = ex.message || 'Erreur lors de la création du tag.';
         err.classList.remove('d-none');
-        return;
-      }
+        return null;
+      });
+      if (!data || !data.ok) return;
 
-      // Ajouter dans la liste + cocher
-      const list = document.getElementById('tagsList');
+      const list = $('#tagsList');
       if (list) {
         const id = Number(data.id);
-        const safeTag = data.tag;     // affiché en textContent (safe)
-        const safeColor = data.color;
-
         const label = document.createElement('label');
         label.className = 'd-flex align-items-center gap-2';
 
@@ -451,15 +448,15 @@
         input.checked = true;
 
         const badge = document.createElement('span');
-        badge.className = `badge text-bg-${safeColor || 'secondary'}`;
-        badge.textContent = safeTag;
+        badge.className = `badge text-bg-${data.color || 'secondary'}`;
+        badge.textContent = data.tag; // safe via textContent
 
         label.appendChild(input);
         label.appendChild(badge);
         list.appendChild(label);
       }
 
-      labelEl.value = '';
+      if (labelEl) labelEl.value = '';
       ok.textContent = 'Tag créé.';
       ok.classList.remove('d-none');
       return;
@@ -470,39 +467,36 @@
       e.preventDefault();
 
       const ideleve = Number(btnSave.dataset.ideleve);
-      const err = document.getElementById('tagErr');
-      const ok = document.getElementById('tagOk');
+      const err = $('#tagErr');
+      const ok = $('#tagOk');
 
       err.classList.add('d-none');
       ok.classList.add('d-none');
 
-      const tagIds = [...document.querySelectorAll('.js-tag-check:checked')]
-        .map(x => Number(x.value))
+      const tagIds = $$('.js-tag-check:checked')
+        .map((x) => Number(x.value))
         .filter(Number.isFinite);
 
-      const res = await fetch(baseUrl() + '/api/eleves/tags', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': csrf(),
-          'X-Requested-With': 'fetch'
-        },
-        body: JSON.stringify({ ideleve, tags: tagIds })
-      });
-
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) {
-        err.textContent = data.error || 'Erreur lors de l’enregistrement.';
+      const data = await postJson('/api/eleves/tags', { ideleve, tags: tagIds }).catch((ex) => {
+        err.textContent = ex.message || 'Erreur lors de l’enregistrement.';
         err.classList.remove('d-none');
-        return;
-      }
+        return null;
+      });
+      if (!data || !data.ok) return;
 
       ok.textContent = 'Tags enregistrés.';
       ok.classList.remove('d-none');
 
-      // Option: fermer la modal après 500ms
-      // ModalManager.close();
+      // Required behavior:
+      // - if opened from another modal => go back (reload previous modal with its original size)
+      // - if opened from a page => close modal
+      setTimeout(() => {
+        if (window.ModalManager && window.ModalManager.canBack()) {
+          window.ModalManager.back().catch(() => window.ModalManager.close());
+        } else if (window.ModalManager) {
+          window.ModalManager.close();
+        }
+      }, 150);
     }
   });
 })();
