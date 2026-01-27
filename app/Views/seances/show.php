@@ -16,8 +16,8 @@
               <th style="width:70px;">N°</th>
               <th>Nom (FR)</th>
               <th>الاسم (AR)</th>
+              <th style="width:90px;" colspan="3">Points</th>
               <th></th>
-              <th style="width:90px;">Points</th>
               <th style="width:110px;">Absent</th>
             </tr>
           </thead>
@@ -49,6 +49,24 @@
                     <?= $this->e(($e['nomar'] ?? '').' '.($e['prenomar'] ?? '')) ?>
                   </a>
                 </td>
+                <!-- Points -->
+                <td class="text-nowrap">
+                  <button type="button" class="btn btn-sm btn-outline-secondary"
+                          onclick="AppClassePoints.bump(<?= (int)$seance['id'] ?>, <?= (int)$e['id'] ?>, -1)">
+                    <i class="bi bi-dash"></i>
+                  </button>
+                </td>
+                <td class="text-nowrap">
+                  <span id="pts-<?= (int)$e['id'] ?>" class="mx-2 fw-semibold">
+                    <?= (int)$e['points'] ?>
+                  </span>
+                </td>
+                <td class="text-nowrap">
+                  <button type="button" class="btn btn-sm btn-outline-secondary"
+                          onclick="AppClassePoints.bump(<?= (int)$seance['id'] ?>, <?= (int)$e['id'] ?>, +1)">
+                    <i class="bi bi-plus"></i>
+                  </button>
+                </td>
                 <td>
                   <a class="btn btn-sm btn-outline-secondary"
                     href="/modals/eleves/tags?ideleve=<?= (int)$e['id'] ?>"
@@ -62,33 +80,6 @@
                     data-size="lg">
                     Cahier
                   </a>
-                </td>
-
-                <!-- Points -->
-                <td class="text-nowrap">
-                  <button type="button" class="btn btn-sm btn-outline-secondary"
-                          onclick="AppClassePoints.bump(<?= (int)$seance['id'] ?>, <?= (int)$e['id'] ?>, -1)">
-                    <i class="bi bi-dash"></i>
-                  </button>
-
-                  <span id="pts-<?= (int)$e['id'] ?>" class="mx-2 fw-semibold">
-                    <?= (int)$e['points'] ?>
-                  </span>
-
-                  <button type="button" class="btn btn-sm btn-outline-secondary"
-                          onclick="AppClassePoints.bump(<?= (int)$seance['id'] ?>, <?= (int)$e['id'] ?>, +1)">
-                    <i class="bi bi-plus"></i>
-                  </button>
-                </td>
-
-                <!-- Absence checkbox -->
-                <td class="text-nowrap">
-                  <input type="checkbox"
-                        class="form-check-input js-abs"
-                        data-idseance="<?= (int)$seance['id'] ?>"
-                        data-ideleve="<?= (int)$e['id'] ?>"
-                        <?= ((int)$e['absent'] === 1) ? 'checked' : '' ?>>
-
                   <!-- Absences année cliquable => modal (NE PAS stopPropagation ici) -->
                   <a href="#"
                     class="ms-2 js-modal small text-decoration-none"
@@ -97,6 +88,14 @@
                     onclick="event.preventDefault();">
                     Abs: <?= (int)($e['abs_year'] ?? 0) ?>
                   </a>
+                </td>
+                <!-- Absence checkbox -->
+                <td class="text-nowrap">
+                  <input type="checkbox"
+                        class="form-check-input js-abs"
+                        data-idseance="<?= (int)$seance['id'] ?>"
+                        data-ideleve="<?= (int)$e['id'] ?>"
+                        <?= ((int)$e['absent'] === 1) ? 'checked' : '' ?>>
                 </td>
               </tr>
             <?php endforeach; ?>
