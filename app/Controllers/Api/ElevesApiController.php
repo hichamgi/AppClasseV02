@@ -217,4 +217,69 @@ class ElevesApiController extends Controller
         }
     }
 
+    public function updateNotebook(): void
+    {
+        $this->requireCsrf();
+        $data = $this->inputJson();
+
+        $idacademic = (int)($data['idacademicrecords'] ?? 0);
+        $items = $data['items'] ?? null;
+
+        if ($idacademic <= 0 || !is_array($items)) {
+            $this->json(['ok' => false, 'error' => 'Bad payload'], 400);
+        }
+
+        $pdo = Database::pdo();
+
+        // Sécuriser que le dossier existe (évite upsert “fantôme”)
+        $st = $pdo->prepare("SELECT id FROM dossiers_scolaires WHERE id=:id LIMIT 1");
+        $st->execute(['id' => $idacademic]);
+        if (!$st->fetchColumn()) {
+            $this->json(['ok' => false, 'error' => 'Dossier scolaire introuvable'], 404);
+        }
+
+        $pdo->beginTransaction();
+        try {
+            $sql = "
+            INSERT INTO notebook_scores
+                (idacademicrecords, idmodule, score_cours, score_exercices, score, created_at, updated_at)
+            VALUES
+                (:ar, :m, :c, :x, :t, NOW(), NOW())
+            ON DUPLICATE KEY UPDATE
+                score_cours = VALUES(score_cours),
+                score_exercices = VALUES(score_exercices),
+                score = VALUES(score),
+                updated_at = NOW()
+            ";
+            $up = $pdo->prepare($sql);
+
+            foreach ($items as $it) {
+                $idmodule = (int)($it['idmodule'] ?? 0);
+                if ($idmodule <= 0) continue;
+
+                $cours = (float)($it['cours'] ?? 0);
+                $exo   = (float)($it['exercices'] ?? 0);
+
+                // clamp 0..10
+                if ($cours < 0) $cours = 0; if ($cours > 10) $cours = 10;
+                if ($exo < 0) $exo = 0; if ($exo > 10) $exo = 10;
+
+                $total = $cours + $exo;
+
+                $up->execute([
+                    'ar' => $idacademic,
+                    'm'  => $idmodule,
+                    'c'  => $cours,
+                    'x'  => $exo,
+                    't'  => $total,
+                ]);
+            }
+
+            $pdo->commit();
+            $this->json(['ok' => true]);
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+            $this->json(['ok' => false, 'error' => 'DB error'], 500);
+        }
+    }
 }

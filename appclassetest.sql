@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Hôte : localhost:3306
--- Généré le : mer. 21 jan. 2026 à 18:39
+-- Généré le : mar. 27 jan. 2026 à 02:11
 -- Version du serveur : 11.8.3-MariaDB-0+deb13u1 from Debian
 -- Version de PHP : 8.4.16
 
@@ -11,15 +11,28 @@ SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
 SET time_zone = "+00:00";
 
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8mb4 */;
-
 --
 -- Base de données : `appclassetest`
 --
+
+-- --------------------------------------------------------
+
+--
+-- Structure de la table `ai_appreciations`
+--
+
+CREATE TABLE `ai_appreciations` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `idacademicrecords` int(10) UNSIGNED NOT NULL,
+  `scope` enum('monthly','s1','s2','annual') NOT NULL DEFAULT 's1',
+  `period_key` varchar(20) NOT NULL DEFAULT '',
+  `model` varchar(50) NOT NULL DEFAULT '',
+  `prompt_hash` char(64) NOT NULL DEFAULT '',
+  `result_json` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`result_json`)),
+  `batch_id` varchar(100) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 -- --------------------------------------------------------
 
@@ -158,6 +171,8 @@ CREATE TABLE `notebook_scores` (
   `id` int(10) UNSIGNED NOT NULL,
   `idacademicrecords` int(10) UNSIGNED NOT NULL,
   `idmodule` int(11) UNSIGNED NOT NULL,
+  `score_cours` decimal(5,2) NOT NULL DEFAULT 0.00,
+  `score_exercices` decimal(5,2) NOT NULL DEFAULT 0.00,
   `score` decimal(5,2) NOT NULL DEFAULT 0.00,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -174,8 +189,8 @@ CREATE TABLE `notes` (
   `idacademicrecords` int(10) UNSIGNED NOT NULL,
   `idtypeexamen` tinyint(3) UNSIGNED NOT NULL,
   `note` decimal(5,2) DEFAULT NULL,
-  `absent` tinyint(1) NOT NULL DEFAULT 0,
-  `triche` tinyint(1) NOT NULL DEFAULT 0,
+  `absent` tinyint(1) DEFAULT NULL,
+  `triche` tinyint(1) DEFAULT NULL,
   `observation` varchar(255) DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -284,8 +299,8 @@ CREATE TABLE `seances_parties` (
 
 CREATE TABLE `tags` (
   `id` int(10) UNSIGNED NOT NULL,
-  `tag` varchar(250) NOT NULL DEFAULT '',
-  `color` varchar(250) NOT NULL DEFAULT '',
+  `tag` varchar(250) NOT NULL,
+  `color` varchar(250) NOT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
@@ -325,6 +340,14 @@ CREATE TABLE `users` (
 --
 -- Index pour les tables déchargées
 --
+
+--
+-- Index pour la table `ai_appreciations`
+--
+ALTER TABLE `ai_appreciations`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uk_record_scope_period` (`idacademicrecords`,`scope`,`period_key`),
+  ADD KEY `idx_ai_idacademicrecords` (`idacademicrecords`);
 
 --
 -- Index pour la table `annees`
@@ -491,6 +514,12 @@ ALTER TABLE `users`
 --
 
 --
+-- AUTO_INCREMENT pour la table `ai_appreciations`
+--
+ALTER TABLE `ai_appreciations`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT pour la table `annees`
 --
 ALTER TABLE `annees`
@@ -609,6 +638,12 @@ ALTER TABLE `users`
 --
 
 --
+-- Contraintes pour la table `ai_appreciations`
+--
+ALTER TABLE `ai_appreciations`
+  ADD CONSTRAINT `fk_ai_dossiers` FOREIGN KEY (`idacademicrecords`) REFERENCES `dossiers_scolaires` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
 -- Contraintes pour la table `classes`
 --
 ALTER TABLE `classes`
@@ -632,8 +667,8 @@ ALTER TABLE `eleves_classes`
 -- Contraintes pour la table `eleves_tags`
 --
 ALTER TABLE `eleves_tags`
-  ADD CONSTRAINT `FK_eleves_tags_eleves` FOREIGN KEY (`ideleve`) REFERENCES `eleves` (`id`),
-  ADD CONSTRAINT `FK_eleves_tags_tags` FOREIGN KEY (`idtag`) REFERENCES `tags` (`id`);
+  ADD CONSTRAINT `FK_eleves_tags_eleves` FOREIGN KEY (`ideleve`) REFERENCES `eleves` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `FK_eleves_tags_tags` FOREIGN KEY (`idtag`) REFERENCES `tags` (`id`) ON DELETE CASCADE;
 
 --
 -- Contraintes pour la table `emplois_du_temps`
@@ -694,7 +729,3 @@ ALTER TABLE `seances_parties`
 ALTER TABLE `types_examens`
   ADD CONSTRAINT `FK_types_examens_modules` FOREIGN KEY (`idmodule`) REFERENCES `modules` (`id`);
 COMMIT;
-
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;

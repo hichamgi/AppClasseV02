@@ -67,7 +67,7 @@ class App
         $this->router->get('/modals/eleves/tags', 'App\\Controllers\\ModalController@eleveTags', [AuthMiddleware::class]);
         $this->router->get('/modals/eleves/show', 'App\\Controllers\\ModalController@eleveShow', [AuthMiddleware::class]);
         $this->router->get('/modals/absences/list', 'App\\Controllers\\ModalController@absencesList', [AuthMiddleware::class]);
-
+        $this->router->get('/modals/eleves/notebook', 'App\\Controllers\\ModalController@eleveNotebook', [AuthMiddleware::class]);
 
 
         // API actions (JSON)
@@ -76,7 +76,7 @@ class App
         $this->router->post('/api/eleves/tags', 'App\\Controllers\\Api\\ElevesApiController@setTags', [AuthMiddleware::class]);
         $this->router->post('/api/points/update', 'App\\Controllers\\Api\\ElevesApiController@updatePoints', [AuthMiddleware::class]);
         $this->router->post('/api/tags/create', 'App\\Controllers\\Api\\ElevesApiController@createTag', [AuthMiddleware::class]);
-
+        $this->router->post('/api/eleves/notebook/update', 'App\\Controllers\\Api\\ElevesApiController@updateNotebook', [AuthMiddleware::class]);
 
         // Exemple route admin (si tu en as besoin plus tard)
         $this->router->get('/admin', 'App\\Controllers\\DashboardController@index', [AuthMiddleware::class, AdminMiddleware::class]);

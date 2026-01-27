@@ -499,4 +499,47 @@
       }, 150);
     }
   });
+
+  document.addEventListener('input', (e) => {
+    const tr = e.target.closest('tr[data-idmodule]');
+    if (!tr) return;
+
+    const c = tr.querySelector('.js-nb-cours');
+    const x = tr.querySelector('.js-nb-exo');
+    const t = tr.querySelector('.js-nb-total');
+    if (!c || !x || !t) return;
+
+    const cours = Number(c.value || 0);
+    const exo = Number(x.value || 0);
+    t.textContent = (cours + exo).toFixed(1);
+  });
+
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('#btnNotebookSave');
+    if (!btn) return;
+
+    e.preventDefault();
+
+    const err = document.getElementById('nbErr');
+    const ok = document.getElementById('nbOk');
+    err?.classList.add('d-none');
+    ok?.classList.add('d-none');
+
+    const idacademicrecords = Number(btn.dataset.idacademic);
+
+    const items = [...document.querySelectorAll('tr[data-idmodule]')].map(tr => {
+      const idmodule = Number(tr.dataset.idmodule);
+      const cours = Number(tr.querySelector('.js-nb-cours')?.value || 0);
+      const exercices = Number(tr.querySelector('.js-nb-exo')?.value || 0);
+      return { idmodule, cours, exercices };
+    });
+
+    try {
+      await postJson('/api/eleves/notebook/update', { idacademicrecords, items });
+      if (ok) { ok.textContent = 'Enregistré.'; ok.classList.remove('d-none'); }
+    } catch (ex) {
+      if (err) { err.textContent = ex.message || 'Erreur'; err.classList.remove('d-none'); }
+    }
+  });
+
 })();

@@ -56,7 +56,12 @@
                     data-size="lg">
                     Tags
                   </a>
-
+                  <a class="btn btn-sm btn-outline-secondary"
+                    href="/modals/eleves/notebook?ideleve=<?= (int)$e['id'] ?>&idannee=<?= (int)$seance['idannee'] ?>"
+                    data-modal="/modals/eleves/notebook?ideleve=<?= (int)$e['id'] ?>&idannee=<?= (int)$seance['idannee'] ?>"
+                    data-size="lg">
+                    Cahier
+                  </a>
                 </td>
 
                 <!-- Points -->

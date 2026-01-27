@@ -409,6 +409,54 @@ class ModalController extends Controller
 
     }
 
+    public function eleveNotebook(): void
+    {
+        $ideleve = (int)($_GET['ideleve'] ?? 0);
+        $idannee = (int)($_GET['idannee'] ?? 0);
+
+        if ($ideleve <= 0 || $idannee <= 0) {
+            http_response_code(400);
+            echo "Paramètres invalides";
+            return;
+        }
+
+        $pdo = Database::pdo();
+
+        // Élève
+        $st = $pdo->prepare("SELECT id, nom, prenom FROM eleves WHERE id=:id AND deleted_at IS NULL LIMIT 1");
+        $st->execute(['id' => $ideleve]);
+        $eleve = $st->fetch();
+        if (!$eleve) { http_response_code(404); echo "Élève introuvable"; return; }
+
+        // Dossier scolaire pour l'année
+        $st = $pdo->prepare("SELECT id FROM dossiers_scolaires WHERE ideleve=:e AND idannee=:a LIMIT 1");
+        $st->execute(['e' => $ideleve, 'a' => $idannee]);
+        $idacademic = (int)($st->fetchColumn() ?: 0);
+        if ($idacademic <= 0) { http_response_code(404); echo "Dossier scolaire introuvable"; return; }
+
+        // Modules + scores (LEFT JOIN)
+        $st = $pdo->prepare("
+        SELECT
+            m.id AS idmodule, m.abrev, m.module,
+            ns.score_cours, ns.score_exercices
+        FROM modules m
+        LEFT JOIN notebook_scores ns
+            ON ns.idmodule = m.id AND ns.idacademicrecords = :ar
+        WHERE m.id >= 1
+        ORDER BY m.id ASC
+        ");
+        $st->execute(['ar' => $idacademic]);
+        $rows = $st->fetchAll();
+
+        $this->view('modals/eleves_notebook', [
+            'eleve' => $eleve,
+            'idannee' => $idannee,
+            'idacademicrecords' => $idacademic,
+            'rows' => $rows,
+        ], layout: null);
+    }
+
+
     public function absencesList(): void
     {
         $ideleve = (int)($_GET['ideleve'] ?? 0);
