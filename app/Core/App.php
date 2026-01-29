@@ -5,6 +5,7 @@ namespace App\Core;
 
 use App\Middleware\AuthMiddleware;
 use App\Middleware\AdminMiddleware;
+use App\Core\Container;
 
 class App
 {
@@ -19,7 +20,10 @@ class App
         // DB singleton init
         Database::init(require dirname(__DIR__) . '/config/database.php');
 
-        $this->router = new Router($this->config['base_url'] ?? '');
+        $container = new Container(Database::pdo());
+
+        $this->router = new Router($this->config['base_url'] ?? '', $container);
+
         $this->registerRoutes();
     }
 
@@ -80,5 +84,8 @@ class App
 
         // Exemple route admin (si tu en as besoin plus tard)
         $this->router->get('/admin', 'App\\Controllers\\DashboardController@index', [AuthMiddleware::class, AdminMiddleware::class]);
+
+        $this->router->get('/notebook/global', 'App\\Controllers\\NotebookController@global', [AuthMiddleware::class]);
+        $this->router->get('/api/notebook/global', 'App\\Controllers\\Api\\NotebookApiController@global', [AuthMiddleware::class]);
     }
 }

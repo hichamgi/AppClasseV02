@@ -7,10 +7,12 @@ class Router
 {
     private array $routes = [];
     private string $baseUrl;
+    private ?Container $container;
 
-    public function __construct(string $baseUrl = '')
+    public function __construct(string $baseUrl = '', ?Container $container = null)
     {
         $this->baseUrl = rtrim($baseUrl, '/');
+        $this->container = $container;
     }
 
     public function get(string $path, string $handler, array $middleware = []): void
@@ -55,7 +57,11 @@ class Router
                 }
 
                 [$class, $action] = explode('@', $route['handler'], 2);
-                $controller = new $class();
+
+                $controller = $this->container
+                    ? $this->container->get($class)
+                    : new $class();
+
                 $controller->$action($args);
                 return;
             }

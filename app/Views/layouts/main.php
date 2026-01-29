@@ -32,6 +32,9 @@ $user = Auth::user();
       <ul class="navbar-nav me-auto">
         <li class="nav-item"><a class="nav-link" href="<?= $baseUrl ?>/classes">Classes</a></li>
         <li class="nav-item"><a class="nav-link" href="<?= $baseUrl ?>/eleves">Élèves</a></li>
+        <li class="nav-item">
+          <a class="nav-link" href="<?= $baseUrl ?>/notebook/global">Cahier global</a>
+        </li>
       </ul>
       <div class="d-flex align-items-center gap-2 text-white">
         <span class="small"><?= htmlspecialchars(($user['username'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
