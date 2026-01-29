@@ -42,3 +42,25 @@ a.abs-link:hover {
   text-decoration: underline;
 }
 
+/* Laisse les colonnes se dimensionner au contenu */
+.notebook-matrix { 
+  width: max-content; table-layout: auto; 
+}
+
+/* Colonne "Partie" : large, mais plafonnée */
+.notebook-matrix .col-partie { 
+  min-width: 220px; max-width: 420px; 
+}
+
+/* Colonnes classes : largeur au contenu, plafonnée */
+.notebook-matrix .col-classe { 
+  width: 1%; white-space: nowrap; 
+}
+
+/* Badges dates : évite d’élargir les colonnes */
+.notebook-matrix td { 
+  white-space: normal; 
+}
+.notebook-matrix td .badge { 
+  display: inline-block; 
+}

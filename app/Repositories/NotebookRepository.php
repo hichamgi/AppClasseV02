@@ -166,10 +166,11 @@ final class NotebookRepository
 
         // Label lisible (ne touche PAS à l’ordre)
         foreach ($rows as &$r) {
-            $mod = trim((string)($r['module_abrev'] ?? $r['module_lib'] ?? ''));
+            //$mod = trim((string)($r['module_abrev'] ?? $r['module_lib'] ?? ''));
             $num = trim((string)($r['num'] ?? ''));
             $par = trim((string)($r['partie'] ?? ''));
-            $r['label'] = trim(($mod !== '' ? $mod.' • ' : '') . ($num !== '' ? $num.' ' : '') . $par);
+            //$r['label'] = trim(($mod !== '' ? $mod.' • ' : '') . ($num !== '' ? $num.' ' : '') . $par);
+            $r['label'] = trim(($num !== '' ? $num.' ' : '') . $par);
         }
         unset($r);
 

@@ -1,4 +1,6 @@
 <?php
+use App\Helpers\DateHelper;
+
 $classes = $classes ?? [];
 $parties = $parties ?? [];
 $matrix  = $matrix ?? [];
@@ -12,6 +14,7 @@ $moduleId = $filters['module_id'] ?? '';
 
 $baseUrl = (require dirname(__DIR__, 2) . '/config/app.php')['base_url'] ?? '';
 $baseUrl = rtrim($baseUrl, '/');
+
 ?>
 
 <h1 class="h4 mb-3">Cahier de texte — Matrice (Parties × Classes)</h1>
@@ -44,12 +47,12 @@ $baseUrl = rtrim($baseUrl, '/');
   <div class="card-header fw-semibold">Matrice</div>
 
   <div class="table-responsive">
-    <table class="table table-sm table-bordered mb-0 align-middle">
+    <table class="table table-sm table-bordered mb-0 align-middle w-auto notebook-matrix" style="table-layout:auto;">
       <thead class="table-light">
         <tr>
-          <th style="min-width:320px;">Partie</th>
+          <th class="col-partie">Partie</th>
           <?php foreach ($classes as $c): ?>
-            <th class="text-center" style="min-width:180px;"><?= $this->e($c['classe']) ?></th>
+            <th class="text-center col-classe"><?= $this->e($c['classe']) ?></th>
           <?php endforeach; ?>
         </tr>
       </thead>
@@ -72,8 +75,9 @@ $baseUrl = rtrim($baseUrl, '/');
               <?php else: ?>
                 <?php foreach ($dates as $it): ?>
                     <a class="badge text-bg-danger me-1 mb-1 text-decoration-none"
-                        href="<?= $baseUrl ?>/seances/<?= (int)$it['id'] ?>">
-                        <?= $this->e((string)$it['date']) ?>
+                        href="<?= $baseUrl ?>/seances/<?= (int)$it['id'] ?>"
+                         title="<?= $this->e(DateHelper::toFr((string)$it['date'])) ?>">
+                        <?= $this->e(DateHelper::toDdMm((string)$it['date'])) ?>
                     </a>
                 <?php endforeach; ?>
               <?php endif; ?>
@@ -98,8 +102,9 @@ $baseUrl = rtrim($baseUrl, '/');
                 <?php else: ?>
                     <?php foreach ($dates as $it): ?>
                         <a class="badge text-bg-secondary me-1 mb-1 text-decoration-none"
-                            href="<?= $baseUrl ?>/seances/<?= (int)$it['id'] ?>">
-                            <?= $this->e((string)$it['date']) ?>
+                            href="<?= $baseUrl ?>/seances/<?= (int)$it['id'] ?>"
+                            title="<?= $this->e(DateHelper::toFr((string)$it['date'])) ?>">
+                            <?= $this->e(DateHelper::toDdMm((string)$it['date'])) ?>
                         </a>
                     <?php endforeach; ?>
                 <?php endif; ?>
