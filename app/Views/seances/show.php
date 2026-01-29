@@ -1,7 +1,10 @@
+<?php
+use App\Helpers\DateHelper;   
+?>
 <h1 class="h4 mb-3">
   Séance — <?= $this->e($seance['classe']) ?>
   <span class="text-muted">
-    (<?= $this->e($seance['date']) ?>, <?= $this->e($seance['heured']) ?>)
+    (<?= $this->e(DateHelper::toHuman($seance['date'])) ?>, <?= $this->e($seance['heured']) ?>)
   </span>
 </h1>
 
