@@ -45,4 +45,9 @@ final class DateHelper
 
         return $fmt->format($dt) ?: $ymd;
     }
+
+    public static function toHuman(string $ymd): string
+    {
+        return self::toFr($ymd, 'EEEE dd MMMM yyyy');
+    }
 }
