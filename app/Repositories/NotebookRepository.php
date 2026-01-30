@@ -91,28 +91,6 @@ final class NotebookRepository
     }
 
 
-    public function attachPartieToSeance(int $seanceId, ?int $partieId): bool
-    {
-        // partieId null => désaffecter (utile si correction)
-        $stmt = $this->db->prepare("
-            UPDATE seances
-            SET partie_id = :partie_id
-            WHERE id = :seance_id
-            LIMIT 1
-        ");
-
-        $stmt->bindValue(':seance_id', $seanceId, PDO::PARAM_INT);
-
-        if ($partieId === null) {
-            $stmt->bindValue(':partie_id', null, PDO::PARAM_NULL);
-        } else {
-            $stmt->bindValue(':partie_id', $partieId, PDO::PARAM_INT);
-        }
-
-        $stmt->execute();
-        return $stmt->rowCount() === 1;
-    }
-
     /** @return array<int, array{id:int, classe:string}> */
     public function fetchClasses(?int $anneeId = null): array
     {
@@ -141,11 +119,12 @@ final class NotebookRepository
             SELECT
                 p.id       AS partie_id,
                 p.idmodule AS module_id,
+                p.niv      AS niv,
+                p.partie   AS partie,
+                p.num      AS num,
                 m.abrev    AS module_abrev,
                 m.module   AS module_lib,
-                p.niv      AS niv,
-                p.num      AS num,
-                p.partie   AS partie
+                p.devoir   AS devoir
             FROM parties p
             LEFT JOIN modules m ON m.id = p.idmodule
             WHERE 1=1
@@ -163,14 +142,24 @@ final class NotebookRepository
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $oldmod = null;
 
         // Label lisible (ne touche PAS à l’ordre)
         foreach ($rows as &$r) {
-            //$mod = trim((string)($r['module_abrev'] ?? $r['module_lib'] ?? ''));
+            $mod = trim((string)(($r['module_abrev'] ?? '') . ' : ' . ($r['module_lib'] ?? '')));
             $num = trim((string)($r['num'] ?? ''));
+            $position = strstr($num, ':');
+            $num = ($position !== false) ? ltrim(substr($position, 1)) : '';
             $par = trim((string)($r['partie'] ?? ''));
-            //$r['label'] = trim(($mod !== '' ? $mod.' • ' : '') . ($num !== '' ? $num.' ' : '') . $par);
-            $r['label'] = trim(($num !== '' ? $num.' ' : '') . $par);
+            $niv = (int)($r['niv'] ?? 0);
+            if( $niv === 1 && $mod !== $oldmod) {
+                $r['label'] = trim($mod ?? '') . ' | ' . $par;
+                $oldmod = $mod;
+            }
+            else {
+                //$r['label'] = trim(($mod !== '' ? $mod.' • ' : '') . ($num !== '' ? $num.' ' : '') . $par);
+                $r['label'] = trim(($num !== '' ? $num.'. ' : '') . $par);
+            }
         }
         unset($r);
 

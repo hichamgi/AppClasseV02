@@ -85,32 +85,65 @@ $baseUrl = rtrim($baseUrl, '/');
           <?php endforeach; ?>
         </tr>
 
+        <?php
+          $colspan = 1 + count($classes);
+
+          // Palette de couleurs Bootstrap (tu peux ajuster)
+          $moduleRowClassMap = [
+              0 => 'table-secondary', // Divers
+              1 => 'table-primary',
+              2 => 'table-success',
+              3 => 'table-info',
+              4 => 'table-warning',
+          ];
+        ?>
+
         <!-- Lignes Parties -->
         <?php foreach ($parties as $p): ?>
-          <?php $pid = (int)$p['partie_id']; ?>
-          <tr>
-            <td class="fw-semibold"><?= $this->e($p['label']) ?></td>
+          <?php
+            $pid = (int)$p['partie_id'];
+            $mid = (int)$p['module_id'];
+            $niv = (int)$p['niv'];
+            $devoir  = (int)$p['devoir'];
 
-            <?php foreach ($classes as $c): ?>
-              <?php
-                $cid = (int)$c['id'];
-                $dates = $matrix[$pid][$cid] ?? [];
-              ?>
-              <td>
-                <?php if (empty($dates)): ?>
-                  <span class="text-muted small">—</span>
-                <?php else: ?>
-                    <?php foreach ($dates as $it): ?>
-                        <a class="badge text-bg-secondary me-1 mb-1 text-decoration-none"
-                            href="<?= $baseUrl ?>/seances/<?= (int)$it['id'] ?>"
-                            title="<?= $this->e(DateHelper::toFr((string)$it['date'])) ?>">
-                            <?= $this->e(DateHelper::toDdMm((string)$it['date'])) ?>
-                        </a>
-                    <?php endforeach; ?>
-                <?php endif; ?>
+            // Changement de module => nouvelle couleur
+            $rowClass = ($devoir) ? 'table-danger' : $moduleRowClassMap[$mid] ?? 'table-light'; // fallback si module inattendu
+          ?>
+
+          <?php if ($niv === 1): ?>
+            <!-- Ligne titre (niv=1) prend toute la largeur -->
+            <tr class="<?= $rowClass ?>">
+              <td class="fw-semibold text-center" colspan="<?= $colspan ?>">
+                <?= str_replace('|','<br>',$this->e($p['label'])) ?>
               </td>
-            <?php endforeach; ?>
-          </tr>
+            </tr>
+          <?php else: ?>
+            <!-- Ligne normale : dates par classe -->
+            <tr class="<?= $rowClass ?>">
+              <td class="fw-semibold"><?= $this->e($p['label']) ?></td>
+
+              <?php foreach ($classes as $c): ?>
+                <?php
+                  $cid = (int)$c['id'];
+                  $dates = $matrix[$pid][$cid] ?? [];
+                ?>
+                <td>
+                  <?php if (empty($dates)): ?>
+                    <span class="text-muted small">—</span>
+                  <?php else: ?>
+                    <?php foreach ($dates as $it): ?>
+                      <a class="badge text-bg-secondary me-1 mb-1 text-decoration-none"
+                        href="<?= $baseUrl ?>/seances/<?= (int)$it['id'] ?>"
+                        title="<?= $this->e(DateHelper::toFr((string)$it['date'], 'dd/MM/yyyy')) ?>">
+                        <?= $this->e(DateHelper::toDdMm((string)$it['date'])) ?>
+                      </a>
+                    <?php endforeach; ?>
+                  <?php endif; ?>
+                </td>
+              <?php endforeach; ?>
+            </tr>
+          <?php endif; ?>
+
         <?php endforeach; ?>
 
         <?php if (empty($parties)): ?>

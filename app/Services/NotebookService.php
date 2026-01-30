@@ -36,22 +36,6 @@ final class NotebookService
         ];
     }
 
-    public function attachPartie(int $seanceId, ?int $partieId): void
-    {
-        if ($seanceId <= 0) {
-            throw new InvalidArgumentException('seance_id invalide');
-        }
-        if ($partieId !== null && $partieId <= 0) {
-            throw new InvalidArgumentException('partie_id invalide');
-        }
-
-        $ok = $this->repo->attachPartieToSeance($seanceId, $partieId);
-        if (!$ok) {
-            // règle UX: jamais de page blanche => on remonte une erreur claire
-            throw new InvalidArgumentException("Aucune séance mise à jour (id=$seanceId).");
-        }
-    }
-
     private function validateFilters(array $filters): void
     {
         // Validation légère (tu peux renforcer selon tes règles)
@@ -165,7 +149,13 @@ final class NotebookService
         return [
             'classes' => $classes,
             'parties' => array_map(
-                static fn($p) => ['partie_id' => (int)$p['partie_id'], 'label' => (string)$p['label']],
+                static fn($p) => [
+                    'partie_id' => (int)$p['partie_id'],
+                    'module_id' => (int)$p['module_id'],
+                    'niv'       => (int)$p['niv'],
+                    'label'     => (string)$p['label'],
+                    'devoir'    => (int)$p['devoir'],
+                ],
                 $parties
             ),
             'matrix'  => $matrix,
