@@ -45,6 +45,7 @@ $user = Auth::user();
 </nav>
 
 <main class="container py-4">
+  <div id="bulkSummary" class="px-3 pb-2"></div>
   <?= $content ?>
 </main>
 

@@ -301,25 +301,76 @@
       });
 
       const host = $('#bulkSeancesModal');
-      if (host) {
-        const rows = $$('#bulkRows tr', host);
-        (data.results || []).forEach((r, i) => {
-          const td = rows[i]?.children?.[2];
-          if (!td) return;
+      const rows = host ? $$('#bulkRows tr', host) : [];
 
-          if (r.created) {
-            td.textContent = 'Créée';
-            td.className = 'text-success';
-          } else {
-            td.textContent = (r.reason === 'exists') ? 'Déjà existante' : 'Ignorée';
-            td.className = 'text-warning';
-          }
-        });
+      let created = 0, skipped = 0, errors = 0;
+
+      (data.results || []).forEach((r, i) => {
+        const td = rows[i]?.children?.[2];
+        if (!td) return;
+
+        td.className = ''; // reset
+
+        if (r.created) {
+          created++;
+          td.innerHTML = `<span class="text-success fw-semibold">✓ Créée</span> <span class="text-muted">(#${escapeHtml(r.id)})</span>`;
+          return;
+        }
+
+        // not created
+        const reason = String(r.reason || 'unknown');
+        let label = 'Ignorée';
+        let cls = 'text-warning';
+
+        if (reason === 'exists') {
+          skipped++;
+          label = `Déjà existante (#${escapeHtml(r.id || '')})`;
+          cls = 'text-warning';
+        } else if (reason === 'slot_taken') {
+          skipped++;
+          // id = séance existante, classe_id_taken = classe qui a déjà pris le créneau
+          label = `Créneau pris (séance #${escapeHtml(r.id || '')})`;
+          cls = 'text-danger';
+        } else if (reason === 'invalid') {
+          skipped++;
+          label = 'Données invalides';
+          cls = 'text-danger';
+        } else if (reason === 'db_error') {
+          errors++;
+          label = `DB error: ${escapeHtml(r.error || '')}`;
+          cls = 'text-danger';
+        } else {
+          skipped++;
+          label = `Ignorée (${escapeHtml(reason)})`;
+          cls = 'text-warning';
+        }
+
+        td.innerHTML = `<span class="${cls} fw-semibold">✗ ${label}</span>`;
+      });
+
+      // Résumé (si tu veux l’afficher dans le modal)
+      const summary = { created, skipped, errors };
+      const sumEl = host ? $('#bulkSummary', host) : null;
+      if (sumEl) {
+        sumEl.innerHTML = `
+          <div class="small">
+            <span class="text-success">Créées: <strong>${created}</strong></span>
+            <span class="text-muted mx-2">|</span>
+            <span class="text-warning">Ignorées: <strong>${skipped}</strong></span>
+            <span class="text-muted mx-2">|</span>
+            <span class="text-danger">Erreurs: <strong>${errors}</strong></span>
+          </div>
+        `;
+      } else {
+        console.log('Bulk summary:', summary);
       }
 
-      if (data.refresh) window.location.reload();
-      return data;
+      // ✅ si tu veux recharger uniquement si au moins une création
+      if (created > 0 && data.refresh) window.location.reload();
+
+      return { ...data, summary };
     }
+
 
     function show(date, sessions) {
       const host = ensureHost();
