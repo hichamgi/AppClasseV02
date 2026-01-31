@@ -1,13 +1,13 @@
 <?php
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Repositories\Reporting;
 
 use App\Repositories\AnneeRepository;
 use App\Repositories\ProgrammeRepository;
 use App\Repositories\Reporting\ClassesRepository;
 
-final class ClassesService
+final class ClassesDashboardRepository
 {
     public function __construct(
         private AnneeRepository $annees,

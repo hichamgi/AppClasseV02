@@ -17,12 +17,21 @@ final class ProgrammeRepository
             FROM modules
             ORDER BY id ASC
         ");
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($rows as &$r) {
+            $r['id']  = (int)$r['id'];
+            $r['sem'] = isset($r['sem']) ? (int)$r['sem'] : null;
+        }
+        unset($r);
+
+        return $rows;
     }
 
     /**
      * @return array<int, array{
-     *   partie_id:int, module_id:int, niv:int, partie:string, num:string, module_abrev:?string, module_lib:?string, devoir:int, label:string
+     *   partie_id:int, module_id:int, niv:int, partie:string, num:string,
+     *   module_abrev:?string, module_lib:?string, devoir:int, label:string
      * }>
      */
     public function listParties(?int $moduleId = null): array
