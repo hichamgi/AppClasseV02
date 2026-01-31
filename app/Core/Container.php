@@ -32,12 +32,22 @@ final class Container
         $obj = match ($class) {
 
             // Exemple : Notebook global (à créer)
-            \App\Repositories\NotebookRepository::class =>
-                new \App\Repositories\NotebookRepository($this->pdo),
+            \App\Controllers\ClassesController::class =>
+                new \App\Controllers\ClassesController(
+                    $this->get(\App\Repositories\AnneeRepository::class),
+                    $this->get(\App\Repositories\ProgrammeRepository::class),
+                    $this->get(\App\Repositories\Reporting\ClassesRepository::class),
+                ),
+
+            \App\Repositories\Reporting\ClassesRepository::class =>
+                new \App\Repositories\Reporting\ClassesRepository($this->pdo),
 
             \App\Services\NotebookService::class =>
                 new \App\Services\NotebookService(
-                    $this->get(\App\Repositories\NotebookRepository::class)
+                    $this->get(\App\Repositories\AnneeRepository::class),
+                    $this->get(\App\Repositories\ClasseRepository::class),
+                    $this->get(\App\Repositories\ProgrammeRepository::class),
+                    $this->get(\App\Repositories\Reporting\NotebookRepository::class),
                 ),
 
             \App\Controllers\NotebookController::class =>
@@ -49,6 +59,18 @@ final class Container
                 new \App\Controllers\Api\NotebookApiController(
                     $this->get(\App\Services\NotebookService::class)
                 ),
+
+            \App\Repositories\AnneeRepository::class =>
+                new \App\Repositories\AnneeRepository($this->pdo),
+
+            \App\Repositories\ClasseRepository::class  =>
+                new \App\Repositories\ClasseRepository($this->pdo),
+
+            \App\Repositories\ProgrammeRepository::class =>
+                new \App\Repositories\ProgrammeRepository($this->pdo),
+
+            \App\Repositories\Reporting\NotebookRepository::class =>
+                new \App\Repositories\Reporting\NotebookRepository($this->pdo),
 
             default => new $class(), // fallback safe
         };

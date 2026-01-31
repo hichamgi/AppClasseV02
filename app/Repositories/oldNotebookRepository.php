@@ -5,91 +5,9 @@ namespace App\Repositories;
 
 use PDO;
 
-final class NotebookRepository
+final class oldNotebookRepository
 {
     public function __construct(private PDO $db) {}
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    public function fetchGlobalNotebook(array $filters = []): array
-    {
-        $anneeId     = isset($filters['annee_id']) ? (int)$filters['annee_id'] : null;
-        $classeId    = isset($filters['classe_id']) ? (int)$filters['classe_id'] : null;
-        $dateFrom    = isset($filters['date_from']) ? (string)$filters['date_from'] : null; // YYYY-MM-DD
-        $dateTo      = isset($filters['date_to']) ? (string)$filters['date_to'] : null;     // YYYY-MM-DD
-        $onlyOrphans = !empty($filters['only_orphans']);
-
-        $sql = "
-            SELECT
-                s.id                          AS seance_id,
-                s.date                        AS date_seance,
-                s.heured                      AS heure_debut,
-                s.idclasse                    AS classe_id,
-                c.classe                      AS classe_nom,
-                s.observation                 AS observation,
-
-                COUNT(sp.id)                  AS parties_count,
-
-                GROUP_CONCAT(
-                    DISTINCT CONCAT(
-                        COALESCE(m.abrev, m.module, 'Module'),
-                        ' • ',
-                        COALESCE(p.num, ''),
-                        ' ',
-                        COALESCE(p.partie, '')
-                    )
-                    ORDER BY m.abrev, p.niv, p.num
-                    SEPARATOR ' | '
-                ) AS parties_label
-
-            FROM seances s
-            INNER JOIN classes c ON c.id = s.idclasse
-
-            LEFT JOIN seances_parties sp ON sp.idseance = s.id
-            LEFT JOIN parties p          ON p.id = sp.idpartie
-            LEFT JOIN modules m          ON m.id = p.idmodule
-
-            WHERE s.deleted_at IS NULL
-        ";
-
-        $params = [];
-
-        // Année = portée par la classe (classes.idannee)
-        if ($anneeId !== null) {
-            $sql .= " AND c.idannee = :annee_id";
-            $params[':annee_id'] = $anneeId;
-        }
-
-        if ($classeId !== null) {
-            $sql .= " AND s.idclasse = :classe_id";
-            $params[':classe_id'] = $classeId;
-        }
-
-        if ($dateFrom !== null) {
-            $sql .= " AND s.date >= :date_from";
-            $params[':date_from'] = $dateFrom;
-        }
-
-        if ($dateTo !== null) {
-            $sql .= " AND s.date <= :date_to";
-            $params[':date_to'] = $dateTo;
-        }
-
-        $sql .= " GROUP BY s.id";
-
-        // Orphelines = aucune ligne dans seances_parties
-        if ($onlyOrphans) {
-            $sql .= " HAVING parties_count = 0";
-        }
-
-        $sql .= " ORDER BY s.date DESC, c.classe ASC, s.heured DESC, s.id DESC";
-
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
 
     /** @return array<int, array{id:int, classe:string}> */
     public function fetchClasses(?int $anneeId = null): array
@@ -165,7 +83,6 @@ final class NotebookRepository
 
         return $rows;
     }
-
 
     /**
      * Flux normalisé des séances liées aux parties (ou null si orpheline)
