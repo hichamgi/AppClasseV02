@@ -62,7 +62,12 @@ class Router
                     ? $this->container->get($class)
                     : new $class();
 
-                $controller->$action($args);
+                if (!empty($args)) {
+                    $controller->$action($args);
+                } else {
+                    $controller->$action();
+                }
+
                 return;
             }
         }
@@ -76,7 +81,7 @@ class Router
         $params = [];
         $regex = preg_replace_callback('#\{([a-zA-Z_][a-zA-Z0-9_]*)\}#', function ($m) use (&$params) {
             $params[] = $m[1];
-            return '(?P<' . $m[1] . '>[0-9]+)';
+            return '(?P<' . $m[1] . '>[a-zA-Z0-9_-]+)';
         }, $path);
 
         return '#^' . $regex . '$#';

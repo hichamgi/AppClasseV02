@@ -82,8 +82,12 @@ class App
         $this->router->post('/api/tags/create', 'App\\Controllers\\Api\\ElevesApiController@createTag', [AuthMiddleware::class]);
         $this->router->post('/api/eleves/notebook/update', 'App\\Controllers\\Api\\ElevesApiController@updateNotebook', [AuthMiddleware::class]);
 
-        // Exemple route admin (si tu en as besoin plus tard)
-        $this->router->get('/admin', 'App\\Controllers\\DashboardController@index', [AuthMiddleware::class, AdminMiddleware::class]);
+        // Admin
+        $this->router->get('/admin', 'App\\Controllers\\Admin\\AdminDashboardController@index', [AuthMiddleware::class, AdminMiddleware::class]);
+        $this->router->get('/admin/tools', 'App\\Controllers\\Admin\\AdminToolsController@index', [AuthMiddleware::class, AdminMiddleware::class]);
+        $this->router->get('/admin/tools/{key}', 'App\\Controllers\\Admin\\AdminToolsController@tool', [AuthMiddleware::class, AdminMiddleware::class]);
+        $this->router->post('/admin/tools/{key}', 'App\\Controllers\\Admin\\AdminToolsController@toolPost', [AuthMiddleware::class, AdminMiddleware::class]);
+
 
         $this->router->get('/notebook/global', 'App\\Controllers\\NotebookController@global', [AuthMiddleware::class]);
         $this->router->get('/api/notebook/global', 'App\\Controllers\\Api\\NotebookApiController@global', [AuthMiddleware::class]);
