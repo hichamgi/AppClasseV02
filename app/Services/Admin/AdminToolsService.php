@@ -20,6 +20,7 @@ class AdminToolsService
             'classes' => ['title' => "Classes de l'année", 'icon' => 'collection', 'desc' => "Créer/renommer les classes."],
             'students' => ['title' => "Élèves par classe", 'icon' => 'people', 'desc' => "Lister les élèves par classe."],
             'ramadan' => ['title' => "Ramadan ON/OFF", 'icon' => 'moon-stars', 'desc' => "Basculer le flag Ramadan."],
+            'gedt' => ['title' => "Gestion de l'emploi du temps", 'icon' => 'calendar-week', 'desc' => "Affectation et modification de l'emploi du temps."],
             'password' => ['title' => "Mot de passe", 'icon' => 'key', 'desc' => "Changer le mot de passe admin."],
         ];
     }
@@ -57,6 +58,29 @@ class AdminToolsService
                 'ramadan' => $this->repo->getRamadanFlag(\App\Core\Auth::id()),
             ],
 
+            'gedt' => (function () use ($annee) {
+
+                $classes = $annee ? $this->repo->listClassesForAnnee((int)$annee['id']) : [];
+
+                $rows = ($annee)
+                    ? $this->repo->listEdtForAnnee((int)$annee['id'])
+                    : [];
+
+                // grid[n][heure] = idclasse
+                $grid = [];
+                foreach ($rows as $r) {
+                    $n = (int)$r['n'];
+                    $h = (string)$r['heure'];
+                    $grid[$n][$h] = (int)$r['idclasse'];
+                }
+
+                return [
+                    'annee' => $annee,
+                    'classes' => $classes,
+                    'grid' => $grid,
+                ];
+            })(),
+
             'password' => [],
 
             default => ['_notfound' => true],
@@ -70,6 +94,7 @@ class AdminToolsService
             'ramadan' => $this->postRamadan($post),
             'password' => $this->postPassword($post),
             'classes' => $this->postClasses($post),
+            'gedt' => $this->postEdt($post),
             default => ['ok' => false, 'error' => 'UNKNOWN_TOOL'],
         };
     }
@@ -122,6 +147,18 @@ class AdminToolsService
             }
         }
 
+        return ['ok' => true];
+    }
+
+    private function postEdt(array $post): array
+    {
+        $annee = $this->dashboard->currentAnnee();
+        if (!$annee) return ['ok' => false, 'error' => 'NO_ANNEE'];
+
+        $grid = $post['grid'] ?? null;
+        if (!is_array($grid)) return ['ok' => false, 'error' => 'BAD_GRID'];
+
+        $this->repo->saveEdtGrid((int)$annee['id'], $grid);
         return ['ok' => true];
     }
 }

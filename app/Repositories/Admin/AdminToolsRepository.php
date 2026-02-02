@@ -68,4 +68,95 @@ class AdminToolsRepository
         return (int)($row['ramadan'] ?? 0);
     }
 
+    public function getEdtForClasse(int $idclasse): array
+    {
+        // ⚠️ Ici on doit utiliser TA table EDT réelle.
+        // Exemple générique si tu as une table `emploi_temps` avec json `data`.
+        $st = Database::pdo()->prepare("SELECT data FROM emploi_temps WHERE idclasse=:c LIMIT 1");
+        $st->execute(['c' => $idclasse]);
+        $row = $st->fetch();
+
+        if (!$row || empty($row['data'])) return [];
+
+        $decoded = json_decode((string)$row['data'], true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    public function saveEdtForClasse(int $idclasse, array $edt): void
+    {
+        $json = json_encode($edt, JSON_UNESCAPED_UNICODE);
+
+        // UPSERT portable (SELECT puis UPDATE/INSERT)
+        $st = Database::pdo()->prepare("SELECT id FROM emploi_temps WHERE idclasse=:c LIMIT 1");
+        $st->execute(['c' => $idclasse]);
+        $id = (int)($st->fetchColumn() ?: 0);
+
+        if ($id > 0) {
+            $up = Database::pdo()->prepare("UPDATE emploi_temps SET data=:d WHERE id=:id LIMIT 1");
+            $up->execute(['d' => $json, 'id' => $id]);
+            return;
+        }
+
+        $ins = Database::pdo()->prepare("INSERT INTO emploi_temps (idclasse, data) VALUES (:c,:d)");
+        $ins->execute(['c' => $idclasse, 'd' => $json]);
+    }
+
+    public function listEdtForAnnee(int $idannee): array
+    {
+        $sql = "SELECT edt.idclasse, edt.n, edt.heure
+                FROM emplois_du_temps edt
+                JOIN classes c ON c.id = edt.idclasse
+                WHERE c.idannee = :a
+                AND c.deleted_at IS NULL
+                ORDER BY edt.n ASC, edt.heure ASC";
+        $st = Database::pdo()->prepare($sql);
+        $st->execute(['a' => $idannee]);
+        return $st->fetchAll() ?: [];
+    }
+
+    /**
+     * $grid: [n][heure] => idclasse  (heure format "HH:MM:SS" ou "HH:MM")
+     */
+    public function saveEdtGrid(int $idannee, array $grid): void
+    {
+        $pdo = Database::pdo();
+        $pdo->beginTransaction();
+
+        // Supprimer EDT de l'année
+        $del = $pdo->prepare(
+            "DELETE edt
+            FROM emplois_du_temps edt
+            JOIN classes c ON c.id = edt.idclasse
+            WHERE c.idannee = :a"
+        );
+        $del->execute(['a' => $idannee]);
+
+        $ins = $pdo->prepare(
+            "INSERT INTO emplois_du_temps (idclasse, n, heure)
+            VALUES (:idclasse, :n, :heure)"
+        );
+
+        foreach ($grid as $n => $hours) {
+            $n = (int)$n;
+            if ($n <= 0 || !is_array($hours)) continue;
+
+            foreach ($hours as $heure => $idclasse) {
+                $idclasse = (int)$idclasse;
+                $heure = (string)$heure;
+                if ($idclasse <= 0) continue;
+
+                if (preg_match('/^\d{2}:\d{2}$/', $heure)) $heure .= ':00';
+
+                $ins->execute([
+                    'idclasse' => $idclasse,
+                    'n' => $n,
+                    'heure' => $heure,
+                ]);
+            }
+        }
+
+        $pdo->commit();
+    }
+
+
 }
