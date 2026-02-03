@@ -71,12 +71,12 @@ class Controller
 
     protected function csrfField(): string
     {
-        return '<input type="hidden" name="_token" value="' . $this->e(Csrf::token()) . '">';
+        return '<input type="hidden" name="_csrf" value="' . $this->e(Csrf::token()) . '">';
     }
 
     protected function requireCsrf(): void
     {
-        $token = $_POST['_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+        $token = $_POST['_csrf'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
         if (!Csrf::check((string)$token)) {
             http_response_code(419);
             echo "CSRF token mismatch";

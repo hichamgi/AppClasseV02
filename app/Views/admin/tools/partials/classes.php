@@ -24,7 +24,6 @@ $classes = $data['classes'] ?? [];
     <div class="card-body">
       <form method="post" action="<?= $baseUrl ?>/admin/tools/classes">
         <?= $this->csrfField() ?>
-
         <div class="table-responsive">
           <table class="table table-sm align-middle">
             <thead>

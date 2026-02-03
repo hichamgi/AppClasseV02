@@ -21,6 +21,7 @@ class AdminToolsService
             'students' => ['title' => "Élèves par classe", 'icon' => 'people', 'desc' => "Lister les élèves par classe."],
             'ramadan' => ['title' => "Ramadan ON/OFF", 'icon' => 'moon-stars', 'desc' => "Basculer le flag Ramadan."],
             'gedt' => ['title' => "Gestion de l'emploi du temps", 'icon' => 'calendar-week', 'desc' => "Affectation et modification de l'emploi du temps."],
+            'upstudents' => ['title'=>"Importations des élèves", 'icon'=>'download', 'desc'=>"Importer une liste ou ajouter via modal."],
             'password' => ['title' => "Mot de passe", 'icon' => 'key', 'desc' => "Changer le mot de passe admin."],
         ];
     }
@@ -81,6 +82,11 @@ class AdminToolsService
                 ];
             })(),
 
+            'upstudents' => [
+                'annee' => $annee,
+                'classes' => $annee ? $this->repo->listClassesForAnnee((int)$annee['id']) : [],
+            ],
+
             'password' => [],
 
             default => ['_notfound' => true],
@@ -95,6 +101,7 @@ class AdminToolsService
             'password' => $this->postPassword($post),
             'classes' => $this->postClasses($post),
             'gedt' => $this->postEdt($post),
+            'upstudents' => $this->postUpStudents($post),
             default => ['ok' => false, 'error' => 'UNKNOWN_TOOL'],
         };
     }
@@ -161,4 +168,21 @@ class AdminToolsService
         $this->repo->saveEdtGrid((int)$annee['id'], $grid);
         return ['ok' => true];
     }
+
+    private function postUpStudents(array $post): array
+    {
+        $annee = $this->dashboard->currentAnnee();
+        if (!$annee) return ['ok' => false, 'error' => 'NO_ANNEE'];
+
+        $mode = (string)($post['mode'] ?? 'list'); // 'list' ou 'single'
+        $svc = new \App\Services\Admin\AdminStudentsService();
+
+        if ($mode === 'single') {
+            return $svc->addOneFull((int)$annee['id'], $post);
+        }
+
+        $raw = (string)($post['list'] ?? '');
+        return $svc->importList((int)$annee['id'], $raw);
+    }
+
 }

@@ -120,7 +120,14 @@
       `;
       bsModal.show();
 
-      const fullUrl = url.startsWith('http') ? url : (baseUrl() + url);
+      let fullUrl;
+      if (url.startsWith('http')) {
+        fullUrl = url;
+      } else {
+        const b = baseUrl(); // ex: /AppClasseV02
+        // si l'url commence déjà par baseUrl, ne pas le préfixer
+        fullUrl = url.startsWith(b) ? url : (b + url);
+      }
       const res = await fetch(fullUrl, { headers: { 'X-Requested-With': 'fetch' } });
       const html = await res.text();
 
@@ -178,17 +185,28 @@
     const el = e.target.closest('[data-modal]');
     if (!el) return;
 
-    const t = e.target;
-    if (t && /^(INPUT|BUTTON|SELECT|TEXTAREA|LABEL)$/.test(t.tagName)) return;
+    console.log('[data-modal] click', el, el.getAttribute('href'), el.getAttribute('data-modal'));
+
+    // 1) URL depuis data-modal si non vide
+    let url = (el.getAttribute('data-modal') || '').trim();
+
+    // 2) fallback vers href
+    if (!url) url = (el.getAttribute('href') || '').trim();
+
+    // 3) pas d'URL => rien à faire
+    if (!url || url === '#') return;
 
     e.preventDefault();
 
-    const url = el.getAttribute('data-modal');
-    if (!url) return;
+    // Taille (compatible avec tes anciens attributs)
+    const size =
+      el.getAttribute('data-modal-size') ||
+      el.getAttribute('data-size') ||
+      null;
 
-    const size = el.getAttribute('data-modal-size') || 'modal-lg';
-    window.ModalManager.open(url, { size }).catch((err) => alert('Modal error: ' + err.message));
+    ModalManager.open(url, { size });
   });
+
 
   // -----------------------
   // AppClasse actions

@@ -1,5 +1,4 @@
 <?php
-
 $annee = $data['annee'] ?? null;
 $classes = $data['classes'] ?? [];
 $selected = (int)($data['selectedClasse'] ?? 0);

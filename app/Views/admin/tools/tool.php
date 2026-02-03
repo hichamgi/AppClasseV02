@@ -21,6 +21,7 @@
 
 <?php
 $data = $payload ?? [];
+$report = $report ?? null;
 $partial = __DIR__ . '/partials/' . $key . '.php';
 if (!file_exists($partial)) {
     echo '<div class="alert alert-warning">Partial not found: ' . $this->e($key) . '</div>';

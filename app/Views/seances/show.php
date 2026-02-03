@@ -74,13 +74,13 @@ use App\Helpers\DateHelper;
                   <a class="btn btn-sm btn-outline-secondary"
                     href="/modals/eleves/tags?ideleve=<?= (int)$e['id'] ?>"
                     data-modal='/modals/eleves/tags?ideleve=<?= (int)$e['id'] ?>'
-                    data-size="lg">
+                    data-size="modal-lg">
                     Tags
                   </a>
                   <a class="btn btn-sm btn-outline-secondary"
                     href="/modals/eleves/notebook?ideleve=<?= (int)$e['id'] ?>&idannee=<?= (int)$seance['idannee'] ?>"
                     data-modal="/modals/eleves/notebook?ideleve=<?= (int)$e['id'] ?>&idannee=<?= (int)$seance['idannee'] ?>"
-                    data-size="lg">
+                    data-size="modal-lg">
                     Cahier
                   </a>
                   <!-- Absences année cliquable => modal (NE PAS stopPropagation ici) -->
