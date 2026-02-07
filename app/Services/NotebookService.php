@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Services;
@@ -7,7 +8,6 @@ use App\Repositories\AnneeRepository;
 use App\Repositories\ClasseRepository;
 use App\Repositories\ProgrammeRepository;
 use App\Repositories\Reporting\NotebookRepository;
-use InvalidArgumentException;
 
 final class NotebookService
 {
@@ -97,5 +97,87 @@ final class NotebookService
             'orphans' => $orphans,
             'filters' => $filters,
         ];
+    }
+
+    /**
+     * Données d'impression cahier (séances non imprimées + page de garde si aucune imprimée)
+     */
+    public function getPrintNotebookData(array $filters = []): array
+    {
+        $anneeId = $this->annees->getCurrentId();
+        $annee = $this->annees->getCurrent(); // si ta repo a cette méthode, sinon ignore dans controller
+        $classes = $this->classesRepo->findByAnnee($anneeId);
+
+        $printedCount = $this->notebookRepo->countPrintedSeances($anneeId);
+        $hasAnyPrinted = $printedCount > 0;
+
+        // séances non imprimées, filtrables par date
+        $filtersRepo = [
+            'date_from' => $filters['date_from'] ?? null,
+            'date_to' => $filters['date_to'] ?? null,
+            'only_unprinted' => true,
+        ];
+
+        $seances = $this->notebookRepo->fetchSeancesForPrint($anneeId, $filtersRepo);
+        $seanceIds = array_map(static fn($s) => (int)$s['id'], $seances);
+
+        $partsRows = $this->notebookRepo->fetchPartiesBySeanceIds($seanceIds);
+
+        // index parties par seance
+        $partsBySeance = [];
+        foreach ($partsRows as $r) {
+            $sid = (int)$r['idseance'];
+            $partsBySeance[$sid][] = [
+                'idmodule' => (int)$r['idmodule'],
+                'module' => (string)($r['module'] ?? ''),
+                'abrev' => (string)($r['abrev'] ?? ''),
+                'idpartie' => (int)$r['idpartie'],
+                'partie' => (string)($r['partie'] ?? ''),
+                'num' => (string)($r['num'] ?? ''),
+                'devoir' => (int)($r['devoir'] ?? 0),
+                'niv' => (int)($r['niv'] ?? 0),
+            ];
+        }
+
+        // group par classe
+        $byClasse = [];
+        foreach ($seances as $s) {
+            $cid = (int)$s['idclasse'];
+            $byClasse[$cid]['classe'] = (string)$s['classe'];
+            $byClasse[$cid]['items'][] = [
+                'id' => (int)$s['id'],
+                'date' => (string)$s['date'],
+                'heured' => (string)$s['heured'],
+                'observation' => (string)($s['observation'] ?? ''),
+                // TODO absences: à brancher quand tu me donnes la source absences
+                'absences' => '',
+                'parts' => $partsBySeance[(int)$s['id']] ?? [],
+            ];
+        }
+
+        // remplir classes même si vides
+        foreach ($classes as $c) {
+            $cid = (int)$c['id'];
+            if (!isset($byClasse[$cid])) {
+                $byClasse[$cid] = ['classe' => (string)$c['classe'], 'items' => []];
+            }
+        }
+
+        // tri des classes par nom
+        uasort($byClasse, static fn($a, $b) => strcmp((string)$a['classe'], (string)$b['classe']));
+
+        return [
+            'annee_id' => $anneeId,
+            'classes' => $classes,
+            'byClasse' => $byClasse,
+            'hasAnyPrinted' => $hasAnyPrinted,
+            'filters' => $filters,
+        ];
+    }
+
+    public function confirmPrint(array $seanceIds): array
+    {
+        $count = $this->notebookRepo->markPrinted($seanceIds);
+        return ['updated' => $count];
     }
 }

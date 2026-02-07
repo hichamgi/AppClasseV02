@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Core;
@@ -54,7 +55,7 @@ class App
         $this->router->get('/api/classes', 'App\\Controllers\\Api\\ClassesApiController@index', [AuthMiddleware::class]);
         $this->router->get('/api/eleves', 'App\\Controllers\\Api\\ElevesApiController@index', [AuthMiddleware::class]);
         $this->router->get('/api/eleves/{id}', 'App\\Controllers\\Api\\ElevesApiController@show', [AuthMiddleware::class]);
-        
+
 
         // Actions asynchrones (absences / parties)
         $this->router->post('/api/seances/absence', 'App\\Controllers\\Api\\ElevesApiController@markAbsence', [AuthMiddleware::class]);
@@ -91,5 +92,9 @@ class App
 
         $this->router->get('/notebook/global', 'App\\Controllers\\NotebookController@global', [AuthMiddleware::class]);
         $this->router->get('/api/notebook/global', 'App\\Controllers\\Api\\NotebookApiController@global', [AuthMiddleware::class]);
+
+        // Cahier - Impression
+        $this->router->get('/notebook/print', 'App\\Controllers\\NotebookController@print', [AuthMiddleware::class]);
+        $this->router->post('/api/notebook/print/confirm', 'App\\Controllers\\Api\\NotebookApiController@confirmPrint', [AuthMiddleware::class]);
     }
 }

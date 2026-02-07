@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Repositories;
@@ -23,6 +24,22 @@ final class AnneeRepository
             throw new \RuntimeException("Aucune année scolaire trouvée dans la table annees");
         }
         return (int)$id;
+    }
+
+    public function getCurrent(): String
+    {
+        $stmt = $this->db->query("
+            SELECT annee
+            FROM annees
+            ORDER BY id DESC
+            LIMIT 1
+        ");
+
+        $annee = $stmt->fetchColumn();
+        if (!$annee) {
+            throw new \RuntimeException("Aucune année scolaire trouvée dans la table annees");
+        }
+        return (string)$annee;
     }
 
     /** @return array<int, array{id:int, annee:string}> */

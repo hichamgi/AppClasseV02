@@ -1,14 +1,32 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Controllers\Api;
 
 use App\Core\Controller;
+use App\Core\Database;
+use App\Repositories\AnneeRepository;
+use App\Repositories\ClasseRepository;
+use App\Repositories\ProgrammeRepository;
+use App\Repositories\Reporting\NotebookRepository as NotebookReportingRepository;
 use App\Services\NotebookService;
 
 final class NotebookApiController extends Controller
 {
-    public function __construct(private NotebookService $service) {}
+    private NotebookService $service;
+
+    public function __construct()
+    {
+        $pdo = Database::pdo();
+
+        $this->service = new NotebookService(
+            new AnneeRepository($pdo),
+            new ClasseRepository($pdo),
+            new ProgrammeRepository($pdo),
+            new NotebookReportingRepository($pdo),
+        );
+    }
 
     public function global(): void
     {
@@ -21,12 +39,34 @@ final class NotebookApiController extends Controller
         ];
         $filters = array_filter($filters, static fn($v) => $v !== null && $v !== '');
 
-        $data = $this->service->getGlobalNotebook($filters);
+        $data = $this->service->getGlobalNotebookMatrix($filters);
 
         $this->json([
             'ok' => true,
             'stats' => $data['stats'],
             'items' => $data['items'],
+        ]);
+    }
+
+    public function confirmPrint(): void
+    {
+        $raw = file_get_contents('php://input') ?: '';
+        $json = json_decode($raw, true);
+
+        $ids = $json['ids'] ?? [];
+        if (!is_array($ids)) $ids = [];
+
+        $ids = array_values(array_filter(array_map('intval', $ids), fn($v) => $v > 0));
+        if (empty($ids)) {
+            $this->json(['ok' => false, 'error' => 'Aucune séance sélectionnée']);
+            return;
+        }
+
+        $res = $this->service->confirmPrint($ids);
+
+        $this->json([
+            'ok' => true,
+            'updated' => (int)($res['updated'] ?? 0),
         ]);
     }
 }

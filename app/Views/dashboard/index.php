@@ -9,7 +9,7 @@ $days = [
   6 => 'Samedi',
 ];
 
-$dayKeys = $showSaturday ? [1,2,3,4,5,6] : [1,2,3,4,5];
+$dayKeys = $showSaturday ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5];
 
 $grid = $timetable['grid'] ?? [];
 $hours = $timetable['hours'] ?? [];
@@ -18,16 +18,115 @@ $classStyle = $timetable['classStyle'] ?? [];
 $baseUrl = (require dirname(__DIR__, 2) . '/config/app.php')['base_url'] ?? '';
 $baseUrl = rtrim($baseUrl, '/');
 
-/*
-$allHours = [];
-foreach ($timetable as $c) {
-    foreach (($c['slots'] ?? []) as $n => $hours) {
-        foreach (array_keys($hours) as $h) $allHours[$h] = true;
-    }
+/**
+ * =========================================================
+ * RAMADAN: overlay affichage (DB inchangée)
+ * =========================================================
+ * - heured (DB) reste la même
+ * - heuredAffichage dépend d'un tableau de "shift" (ramadan)
+ * - heuref affichée = heuredAffichage +45min (ramadan) sinon +60min
+ */
+$isRamadan = ((int)($ramadan ?? 0) === 1);
+
+/**
+ * Table demandée:
+ *  - clé = heured DB
+ *  - valeur = heuredAffichage
+ */
+$RAMADAN_SHIFT = [
+  'fri' => [
+    '08:30' => '08:30',
+    '09:30' => '09:20',
+    '10:30' => '10:15',
+    '11:30' => '11:05',
+    '14:30' => '13:40',
+    '15:30' => '14:30',
+    '16:30' => '15:25',
+    '17:30' => '16:15',
+  ],
+  'rest' => [
+    '08:30' => '08:40',
+    '09:30' => '09:30',
+    '10:30' => '10:25',
+    '11:30' => '11:15',
+    '14:30' => '12:30',
+    '15:30' => '13:20',
+    '16:30' => '14:15',
+    '17:30' => '15:05',
+  ]
+];
+
+function normH(string $h): string
+{
+  // "08:30:00" => "08:30"
+  return substr(trim($h), 0, 5);
 }
-$allHours = array_keys($allHours);
-sort($allHours);
-*/
+
+function timeToMin(string $h): int
+{
+  $h = normH($h);
+  $dt = DateTime::createFromFormat('H:i', $h);
+  if (!$dt) return 0;
+  return ((int)$dt->format('H')) * 60 + (int)$dt->format('i');
+}
+
+function addMinutes(string $h, int $mins): string
+{
+  $m = timeToMin($h) + $mins;
+  $m = max(0, $m);
+  $hh = intdiv($m, 60);
+  $ii = $m % 60;
+  return str_pad((string)$hh, 2, '0', STR_PAD_LEFT) . ':' . str_pad((string)$ii, 2, '0', STR_PAD_LEFT);
+}
+
+/**
+ * Retourne l'heure de début AFFICHAGE (heuredAffichage).
+ * - heuredDb = heure DB
+ * - si ramadan: map(fri/rest)[heuredDb] sinon heuredDb
+ */
+function heuredAffichage(string $heuredDb, int $weekdayN, bool $isRamadan, array $RAMADAN_SHIFT): string
+{
+  $heuredDb = normH($heuredDb);
+  if (!$isRamadan) return $heuredDb;
+
+  $key = ($weekdayN === 5) ? 'fri' : 'rest';
+  // si non trouvé => fallback = DB
+  return normH($RAMADAN_SHIFT[$key][$heuredDb] ?? $heuredDb);
+}
+
+/**
+ * Retourne [debutAff, finAff] selon règles:
+ * - debutAff = heuredAffichage(...)
+ * - finAff = debutAff + 45 (ramadan) sinon +60
+ */
+function rangeAffichage(string $heuredDb, int $weekdayN, bool $isRamadan, array $RAMADAN_SHIFT): array
+{
+  $start = heuredAffichage($heuredDb, $weekdayN, $isRamadan, $RAMADAN_SHIFT);
+  $end   = addMinutes($start, $isRamadan ? 45 : 60);
+  return [$start, $end];
+}
+
+/**
+ * État d'un créneau: past | current | future basé sur l'heure AFFICHAGE du jour concerné.
+ */
+function slotState(int $dayN, string $heuredDb, DateTime $now, bool $isRamadan, array $RAMADAN_SHIFT): string
+{
+  $todayN = (int)$now->format('N');
+
+  if ($dayN < $todayN) return 'past';
+  if ($dayN > $todayN) return 'future';
+
+  [$startDisp, $endDisp] = rangeAffichage($heuredDb, $dayN, $isRamadan, $RAMADAN_SHIFT);
+
+  $nowMin   = ((int)$now->format('H')) * 60 + (int)$now->format('i');
+  $startMin = timeToMin($startDisp);
+  $endMin   = timeToMin($endDisp);
+
+  if ($nowMin >= $endMin) return 'past';
+  if ($nowMin >= $startMin && $nowMin < $endMin) return 'current';
+  return 'future';
+}
+
 ?>
 
 <h1 class="h3 mb-3">Tableau de bord</h1>
@@ -84,10 +183,14 @@ sort($allHours);
         <tbody>
           <?php foreach ($todaySeances as $s): ?>
             <?php
-              $start = DateTime::createFromFormat('H:i', (string)$s['heured']);
-              $end = (clone $start)->modify('+1 hour');
-              $range = $start->format('H:i') . ' - ' . $end->format('H:i');
-              $abs = trim((string)($s['absents_numeros'] ?? ''));
+            // DB: heured normal; UI: heuredAffichage + fin calculée selon ramadan
+            $todayN = (int)(new DateTime('now'))->format('N');
+            $hDb = normH((string)$s['heured']);
+
+            [$ds, $de] = rangeAffichage($hDb, $todayN, $isRamadan, $RAMADAN_SHIFT);
+            $range = $ds . ' - ' . $de;
+
+            $abs = trim((string)($s['absents_numeros'] ?? ''));
             ?>
             <tr>
               <td style="white-space:nowrap;"><?= htmlspecialchars($range, ENT_QUOTES, 'UTF-8') ?></td>
@@ -101,7 +204,7 @@ sort($allHours);
               </td>
               <td style="white-space:nowrap;">
                 <a class="btn btn-sm btn-outline-primary"
-                   href="<?= $baseUrl ?>/seances/<?= (int)$s['id'] ?>">
+                  href="<?= $baseUrl ?>/seances/<?= (int)$s['id'] ?>">
                   Ouvrir
                 </a>
               </td>
@@ -113,34 +216,11 @@ sort($allHours);
   </div>
 <?php endif; ?>
 
-
-
 <h2 class="h5 mt-4 mb-2">Emploi du temps (global)</h2>
 
 <?php
 $now = new DateTime('now');
 $todayN = (int)$now->format('N'); // 1=Lundi ... 7=Dimanche
-
-// État d'un créneau: past | current | future
-function slotState(int $dayN, string $h, DateTime $now): string
-{
-    $start = DateTime::createFromFormat('H:i', $h);
-    if (!$start) return 'past';
-    $end = (clone $start)->modify('+1 hour');
-
-    $todayN = (int)$now->format('N');
-
-    if ($dayN < $todayN) return 'past';
-    if ($dayN > $todayN) return 'future';
-
-    $nowMin   = ((int)$now->format('H')) * 60 + (int)$now->format('i');
-    $startMin = ((int)$start->format('H')) * 60 + (int)$start->format('i');
-    $endMin   = ((int)$end->format('H')) * 60 + (int)$end->format('i');
-
-    if ($nowMin >= $endMin) return 'past';
-    if ($nowMin >= $startMin && $nowMin < $endMin) return 'current';
-    return 'future';
-}
 ?>
 
 <?php if (empty($hours)): ?>
@@ -155,10 +235,10 @@ function slotState(int $dayN, string $h, DateTime $now): string
               <th style="white-space:nowrap;text-align:left;">Heure</th>
               <?php foreach ($dayKeys as $dk): ?>
                 <th class="day-header"
-                    role="button"
-                    tabindex="0"
-                    data-weekday="<?= (int)$dk ?>"
-                    style="cursor:pointer; user-select:none;">
+                  role="button"
+                  tabindex="0"
+                  data-weekday="<?= (int)$dk ?>"
+                  style="cursor:pointer; user-select:none;">
                   <?= htmlspecialchars($days[$dk], ENT_QUOTES, 'UTF-8') ?>
                 </th>
               <?php endforeach; ?>
@@ -168,55 +248,53 @@ function slotState(int $dayN, string $h, DateTime $now): string
           <tbody>
             <?php foreach ($hours as $h): ?>
               <?php
-                $start = DateTime::createFromFormat('H:i', $h);
-                $end = (clone $start)->modify('+1 hour');
-                $range = $start->format('H:i') . ' - ' . $end->format('H:i');
+              // heured DB (clé grid) vs heuredAffichage (UI)
+              $hDb = normH((string)$h);
 
-                // État de la ligne "heure" selon aujourd'hui (utile pour griser toute la ligne si passé)
-                $rowState = slotState($todayN, $h, $now);
-                $rowStyle = ($todayN <= 6 && $rowState === 'past') ? 'background: rgba(0,0,0,.02); opacity:.75;' : '';
+              [$ds, $de] = rangeAffichage($hDb, $todayN, $isRamadan, $RAMADAN_SHIFT);
+              $range = $ds . ' - ' . $de;
+
+              $rowState = slotState($todayN, $hDb, $now, $isRamadan, $RAMADAN_SHIFT);
+              $rowStyle = ($todayN <= 6 && $rowState === 'past') ? 'background: rgba(0,0,0,.02); opacity:.75;' : '';
               ?>
-              <tr style="<?= $rowStyle ?>" data-heured="<?= htmlspecialchars($h, ENT_QUOTES, 'UTF-8') ?>">
+              <!-- IMPORTANT: data-heured = heure DB normale (création séance inchangée) -->
+              <tr style="<?= $rowStyle ?>" data-heured="<?= htmlspecialchars($hDb, ENT_QUOTES, 'UTF-8') ?>">
                 <td style="white-space:nowrap;text-align:left;">
                   <?= htmlspecialchars($range, ENT_QUOTES, 'UTF-8') ?>
                 </td>
 
                 <?php foreach ($dayKeys as $dk): ?>
                   <?php
-                    $state = slotState($dk, $h, $now);
+                  $state = slotState($dk, $hDb, $now, $isRamadan, $RAMADAN_SHIFT);
 
-                    // Styles cellule
+                  // Styles cellule
+                  $tdStyle = '';
+                  if ($state === 'past') {
+                    $tdStyle = 'background: rgba(0,0,0,.03); opacity: .70;';
+                  } elseif ($state === 'current') {
+                    $tdStyle = 'background: rgba(13,110,253,.10); box-shadow: inset 0 0 0 2px rgba(13,110,253,.35);';
+                  } else {
                     $tdStyle = '';
-                    if ($state === 'past') {
-                        $tdStyle = 'background: rgba(0,0,0,.03); opacity: .70;';
-                    } elseif ($state === 'current') {
-                        // surlignage propre
-                        $tdStyle = 'background: rgba(13,110,253,.10); box-shadow: inset 0 0 0 2px rgba(13,110,253,.35);';
-                    } elseif ($state === 'future') {
-                        $tdStyle = '';
-                    }
+                  }
 
-                    $cell = $grid[$dk][$h] ?? null;
+                  // Grid indexe par heure DB normale
+                  $cell = $grid[$dk][$hDb] ?? null;
                   ?>
 
                   <td style="<?= $tdStyle ?>" data-weekday="<?= (int)$dk ?>">
                     <?php if ($cell): ?>
                       <?php
-                        $cid = (int)$cell['idclasse'];
-                        $label = (string)$cell['classe'];
+                      $cid = (int)$cell['idclasse'];
+                      $label = (string)$cell['classe'];
 
-                        $style = $classStyle[$cid] ?? ['bg' => 'hsl(0 0% 90%)', 'text' => '#111'];
-                        $badgeOpacity = ($state === 'past') ? 'opacity:.75;' : '';
+                      $style = $classStyle[$cid] ?? ['bg' => 'hsl(0 0% 90%)', 'text' => '#111'];
+                      $badgeOpacity = ($state === 'past') ? 'opacity:.75;' : '';
                       ?>
 
-                      <!-- IMPORTANT:
-                           - class-click + data-classe-id => utilisé par public/assets/app.js
-                           - heured vient du <tr data-heured=".."> => la seule façon de changer l'heure = cliquer la classe sur la ligne voulue
-                      -->
                       <a href="#"
-                         class="class-click"
-                         data-classe-id="<?= (int)$cid ?>"
-                         style="
+                        class="class-click"
+                        data-classe-id="<?= (int)$cid ?>"
+                        style="
                            text-decoration:none;
                            display:inline-block;
                            padding: .25rem .5rem;
@@ -252,9 +330,9 @@ function slotState(int $dayN, string $h, DateTime $now): string
         <div class="fw-semibold mb-2">Légende</div>
         <div class="d-flex flex-wrap gap-2">
           <?php
-            $classes = $timetable['classes'] ?? [];
-            foreach ($classes as $cid => $cname):
-              $style = $classStyle[(int)$cid] ?? ['bg' => 'hsl(0 0% 90%)', 'text' => '#111'];
+          $classes = $timetable['classes'] ?? [];
+          foreach ($classes as $cid => $cname):
+            $style = $classStyle[(int)$cid] ?? ['bg' => 'hsl(0 0% 90%)', 'text' => '#111'];
           ?>
             <span
               style="
@@ -266,8 +344,7 @@ function slotState(int $dayN, string $h, DateTime $now): string
                 border: 1px solid rgba(0,0,0,.10);
                 font-weight: 600;
                 font-size: .85rem;
-              "
-            >
+              ">
               <?= htmlspecialchars($cname, ENT_QUOTES, 'UTF-8') ?>
             </span>
           <?php endforeach; ?>
@@ -277,6 +354,10 @@ function slotState(int $dayN, string $h, DateTime $now): string
       <div class="text-muted small mt-2">
         Clique sur une <strong>classe</strong> pour créer une séance (date=aujourd’hui, heure=ligne).
         Clique sur un <strong>jour</strong> pour créer toutes les séances de ce jour (aujourd’hui ou prochaine occurrence).
+        <?php if ($isRamadan): ?>
+          <br><span class="badge text-bg-warning">RAMADAN</span>
+          Affichage adapté: début affiché via mapping + fin = +45 min. La base conserve les horaires normaux.
+        <?php endif; ?>
       </div>
 
     </div>
@@ -305,7 +386,7 @@ function slotState(int $dayN, string $h, DateTime $now): string
               <td><?= htmlspecialchars($lp['classe'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
               <td>
                 <span class="badge bg-secondary">
-                   <?= htmlspecialchars($lp['abrev'] ?: $lp['module']) ?>
+                  <?= htmlspecialchars($lp['abrev'] ?: $lp['module']) ?>
                 </span>
               </td>
               <td>
@@ -316,9 +397,7 @@ function slotState(int $dayN, string $h, DateTime $now): string
                     <?= htmlspecialchars($lp['abrev'] ?: $lp['module'], ENT_QUOTES, 'UTF-8') ?>
                     <?= $lp['num'] ? ' – ' . htmlspecialchars($lp['num'], ENT_QUOTES, 'UTF-8') : '' ?>
                   </small>
-                  <br>
-                  
-                  <br>
+                  <br><br>
                   <span class="badge bg-light text-dark">
                     <?= htmlspecialchars($lp['num']) ?>
                   </span>

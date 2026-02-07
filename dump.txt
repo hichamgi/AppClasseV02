@@ -1,0 +1,557 @@
+--------------------------------------------------------------------------------
+1- App.php (routes)
+--------------------------------------------------------------------------------
+<?php
+declare(strict_types=1);
+
+namespace App\Core;
+
+use App\Middleware\AuthMiddleware;
+use App\Middleware\AdminMiddleware;
+use App\Core\Container;
+
+class App
+{
+    private Router $router;
+    private array $config;
+
+    public function __construct()
+    {
+        $this->config = require dirname(__DIR__) . '/config/app.php';
+        date_default_timezone_set($this->config['timezone'] ?? 'UTC');
+
+        // DB singleton init
+        Database::init(require dirname(__DIR__) . '/config/database.php');
+
+        $container = new Container(Database::pdo());
+
+        $this->router = new Router($this->config['base_url'] ?? '', $container);
+
+        $this->registerRoutes();
+    }
+
+    public function run(): void
+    {
+        $this->router->dispatch();
+    }
+
+    private function registerRoutes(): void
+    {
+        // Web
+        $this->router->get('/login', 'App\\Controllers\\AuthController@loginForm');
+        $this->router->post('/login', 'App\\Controllers\\AuthController@login');
+        $this->router->get('/twofa', 'App\\Controllers\\AuthController@twofaForm');
+        $this->router->post('/twofa', 'App\\Controllers\\AuthController@twofaVerify');
+        $this->router->get('/logout', 'App\\Controllers\\AuthController@logout');
+
+        $this->router->get('/', 'App\\Controllers\\DashboardController@index', [AuthMiddleware::class]);
+        $this->router->get('/dashboard', 'App\\Controllers\\DashboardController@index', [AuthMiddleware::class]);
+
+        $this->router->get('/classes', 'App\\Controllers\\ClassesController@index', [AuthMiddleware::class]);
+        $this->router->get('/eleves', 'App\\Controllers\\ElevesController@index', [AuthMiddleware::class]);
+        $this->router->get('/eleves/{id}', 'App\\Controllers\\ElevesController@show', [AuthMiddleware::class]);
+
+        $this->router->get('/seances/{id}', 'App\\Controllers\\SeancesController@show', [AuthMiddleware::class]);
+
+        // API (JSON)
+        $this->router->get('/api/classes', 'App\\Controllers\\Api\\ClassesApiController@index', [AuthMiddleware::class]);
+        $this->router->get('/api/eleves', 'App\\Controllers\\Api\\ElevesApiController@index', [AuthMiddleware::class]);
+        $this->router->get('/api/eleves/{id}', 'App\\Controllers\\Api\\ElevesApiController@show', [AuthMiddleware::class]);
+        
+
+        // Actions asynchrones (absences / parties)
+        $this->router->post('/api/seances/absence', 'App\\Controllers\\Api\\ElevesApiController@markAbsence', [AuthMiddleware::class]);
+        $this->router->post('/api/seances/partie', 'App\\Controllers\\Api\\ElevesApiController@attachPartie', [AuthMiddleware::class]);
+        $this->router->post('/api/seances/observation', 'App\\Controllers\\Api\\SeancesApiController@updateObservation', [AuthMiddleware::class]);
+        $this->router->post('/api/seances/partie/delete', 'App\\Controllers\\Api\\SeancesApiController@detachPartie', [AuthMiddleware::class]);
+
+
+
+        // Modals (HTML partials)
+        $this->router->get('/modals/seances/new', 'App\\Controllers\\ModalController@newSeance', [AuthMiddleware::class]);
+        $this->router->get('/modals/seances/absences', 'App\\Controllers\\ModalController@absences', [AuthMiddleware::class]);
+        $this->router->get('/modals/seances/parties', 'App\\Controllers\\ModalController@parties', [AuthMiddleware::class]);
+        $this->router->get('/modals/eleves/tags', 'App\\Controllers\\ModalController@eleveTags', [AuthMiddleware::class]);
+        $this->router->get('/modals/eleves/show', 'App\\Controllers\\ModalController@eleveShow', [AuthMiddleware::class]);
+        $this->router->get('/modals/absences/list', 'App\\Controllers\\ModalController@absencesList', [AuthMiddleware::class]);
+        $this->router->get('/modals/eleves/notebook', 'App\\Controllers\\ModalController@eleveNotebook', [AuthMiddleware::class]);
+
+
+        // API actions (JSON)
+        $this->router->post('/api/seances/create', 'App\\Controllers\\Api\\SeancesApiController@create', [AuthMiddleware::class]);
+        $this->router->post('/api/seances/create-bulk', 'App\\Controllers\\Api\\SeancesApiController@createBulk', [AuthMiddleware::class]);
+        $this->router->post('/api/eleves/tags', 'App\\Controllers\\Api\\ElevesApiController@setTags', [AuthMiddleware::class]);
+        $this->router->post('/api/points/update', 'App\\Controllers\\Api\\ElevesApiController@updatePoints', [AuthMiddleware::class]);
+        $this->router->post('/api/tags/create', 'App\\Controllers\\Api\\ElevesApiController@createTag', [AuthMiddleware::class]);
+        $this->router->post('/api/eleves/notebook/update', 'App\\Controllers\\Api\\ElevesApiController@updateNotebook', [AuthMiddleware::class]);
+
+        // Admin
+        $this->router->get('/admin', 'App\\Controllers\\Admin\\AdminDashboardController@index', [AuthMiddleware::class, AdminMiddleware::class]);
+        $this->router->get('/admin/tools', 'App\\Controllers\\Admin\\AdminToolsController@index', [AuthMiddleware::class, AdminMiddleware::class]);
+        $this->router->get('/admin/tools/{key}', 'App\\Controllers\\Admin\\AdminToolsController@tool', [AuthMiddleware::class, AdminMiddleware::class]);
+        $this->router->post('/admin/tools/{key}', 'App\\Controllers\\Admin\\AdminToolsController@toolPost', [AuthMiddleware::class, AdminMiddleware::class]);
+
+
+        $this->router->get('/notebook/global', 'App\\Controllers\\NotebookController@global', [AuthMiddleware::class]);
+        $this->router->get('/api/notebook/global', 'App\\Controllers\\Api\\NotebookApiController@global', [AuthMiddleware::class]);
+    }
+}
+--------------------------------------------------------------------------------
+2- NotebookController.php
+--------------------------------------------------------------------------------
+<?php
+declare(strict_types=1);
+
+namespace App\Controllers;
+
+use App\Core\Controller;
+use App\Core\Database;
+use App\Repositories\AnneeRepository;
+use App\Repositories\ClasseRepository;
+use App\Repositories\ProgrammeRepository;
+use App\Repositories\Reporting\NotebookRepository as NotebookReportingRepository;
+use App\Services\NotebookService;
+
+final class NotebookController extends Controller
+{
+    private NotebookService $service;
+
+    public function __construct()
+    {
+        $pdo = Database::pdo();
+
+        $this->service = new NotebookService(
+            new AnneeRepository($pdo),
+            new ClasseRepository($pdo),
+            new ProgrammeRepository($pdo),
+            new NotebookReportingRepository($pdo),
+        );
+    }
+
+    public function global(): void
+    {
+        $filters = [
+            'date_from'    => $_GET['date_from'] ?? null,
+            'date_to'      => $_GET['date_to'] ?? null,
+            'classe_id'    => $_GET['classe_id'] ?? null,
+            'module_id'    => $_GET['module_id'] ?? null,
+        ];
+
+        $filters = array_filter($filters, static fn($v) => $v !== null && $v !== '');
+
+        $data = $this->service->getGlobalNotebookMatrix($filters);
+
+        $this->view('notebook/global_matrix', $data);
+    }
+}
+--------------------------------------------------------------------------------
+3- Repositories/Reporting/NotebookRepository.php
+--------------------------------------------------------------------------------
+<?php
+declare(strict_types=1);
+
+namespace App\Repositories\Reporting;
+
+use PDO;
+
+final class NotebookRepository
+{
+    public function __construct(private PDO $db) {}
+
+    /**
+     * Flux normalisé des séances liées aux parties (ou null si orpheline)
+     * @return array<int, array{seance_id:int, classe_id:int, date:string, partie_id:?int}>
+     */
+    public function fetchSeancesLinks(array $filters = []): array
+    {
+        $anneeId  = isset($filters['annee_id']) ? (int)$filters['annee_id'] : null;
+        $classeId = isset($filters['classe_id']) ? (int)$filters['classe_id'] : null;
+        $dateFrom = isset($filters['date_from']) ? (string)$filters['date_from'] : null; // YYYY-MM-DD
+        $dateTo   = isset($filters['date_to']) ? (string)$filters['date_to'] : null;     // YYYY-MM-DD
+        $moduleId = isset($filters['module_id']) ? (int)$filters['module_id'] : null;
+
+        $sql = "
+            SELECT
+                s.id        AS seance_id,
+                s.idclasse  AS classe_id,
+                s.date      AS date,
+                sp.idpartie AS partie_id
+            FROM seances s
+            INNER JOIN classes c ON c.id = s.idclasse
+            LEFT JOIN seances_parties sp ON sp.idseance = s.id
+            LEFT JOIN parties p ON p.id = sp.idpartie
+            WHERE s.deleted_at IS NULL
+              AND c.deleted_at IS NULL
+        ";
+        $params = [];
+
+        if ($anneeId !== null) {
+            $sql .= " AND c.idannee = :annee";
+            $params[':annee'] = $anneeId;
+        }
+        if ($classeId !== null) {
+            $sql .= " AND s.idclasse = :classe";
+            $params[':classe'] = $classeId;
+        }
+        if ($dateFrom !== null) {
+            $sql .= " AND s.date >= :df";
+            $params[':df'] = $dateFrom;
+        }
+        if ($dateTo !== null) {
+            $sql .= " AND s.date <= :dt";
+            $params[':dt'] = $dateTo;
+        }
+
+        if ($moduleId !== null) {
+            // filtre module : on garde orphelines + parties du module
+            $sql .= " AND (sp.idpartie IS NULL OR p.idmodule = :mid)";
+            $params[':mid'] = $moduleId;
+        }
+
+        $sql .= " ORDER BY s.date ASC, s.id ASC";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+--------------------------------------------------------------------------------
+4- Services/NotebookService.php
+--------------------------------------------------------------------------------
+<?php
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\Repositories\AnneeRepository;
+use App\Repositories\ClasseRepository;
+use App\Repositories\ProgrammeRepository;
+use App\Repositories\Reporting\NotebookRepository;
+use InvalidArgumentException;
+
+final class NotebookService
+{
+    public function __construct(
+        private AnneeRepository $annees,
+        private ClasseRepository $classesRepo,
+        private ProgrammeRepository $programme,
+        private NotebookRepository $notebookRepo
+    ) {}
+
+    public function getGlobalNotebookMatrix(array $filters = []): array
+    {
+        $anneeId  = $this->annees->getCurrentId();
+        $moduleId = isset($filters['module_id']) ? (int)$filters['module_id'] : null;
+
+        $classes = $this->classesRepo->findByAnnee($anneeId);
+        $parties = $this->programme->listParties($moduleId);
+
+        $filters['annee_id'] = $anneeId;
+        $links = $this->notebookRepo->fetchSeancesLinks($filters);
+
+        $classIds  = array_map(static fn($c) => (int)$c['id'], $classes);
+        $partieIds = array_map(static fn($p) => (int)$p['partie_id'], $parties);
+
+        $matrix = [];
+        foreach ($partieIds as $pid) {
+            foreach ($classIds as $cid) {
+                $matrix[$pid][$cid] = [];
+            }
+        }
+
+        $orphans = [];
+        foreach ($classIds as $cid) {
+            $orphans[$cid] = [];
+        }
+
+        foreach ($links as $r) {
+            $sid  = (int)($r['seance_id'] ?? 0);
+            $cid  = (int)($r['classe_id'] ?? 0);
+            $date = (string)($r['date'] ?? '');
+            $pid  = array_key_exists('partie_id', $r) && $r['partie_id'] !== null ? (int)$r['partie_id'] : null;
+
+            if ($sid <= 0 || $cid <= 0 || $date === '' || !isset($orphans[$cid])) continue;
+
+            $item = ['id' => $sid, 'date' => $date];
+
+            if ($pid === null) {
+                $orphans[$cid][] = $item;
+            } elseif (isset($matrix[$pid][$cid])) {
+                $matrix[$pid][$cid][] = $item;
+            }
+        }
+
+        $dedupSort = static function (array $items): array {
+            $map = [];
+            foreach ($items as $it) {
+                $id = (int)($it['id'] ?? 0);
+                if ($id > 0) $map[$id] = $it;
+            }
+            $items = array_values($map);
+            usort($items, static fn($a, $b) => strcmp((string)$a['date'], (string)$b['date']));
+            return $items;
+        };
+
+        foreach ($orphans as $cid => $items) {
+            $orphans[$cid] = $dedupSort($items);
+        }
+        foreach ($matrix as $pid => $cols) {
+            foreach ($cols as $cid => $items) {
+                $matrix[$pid][$cid] = $dedupSort($items);
+            }
+        }
+
+        return [
+            'classes' => $classes,
+            'parties' => array_map(
+                static fn($p) => [
+                    'partie_id' => (int)$p['partie_id'],
+                    'module_id' => (int)$p['module_id'],
+                    'niv'       => (int)$p['niv'],
+                    'label'     => (string)$p['label'],
+                    'devoir'    => (int)$p['devoir'],
+                ],
+                $parties
+            ),
+            'matrix'  => $matrix,
+            'orphans' => $orphans,
+            'filters' => $filters,
+        ];
+    }
+}
+--------------------------------------------------------------------------------
+5- Views/notebook/global_matrix.php
+--------------------------------------------------------------------------------
+<?php
+use App\Helpers\DateHelper;
+
+$classes = $classes ?? [];
+$parties = $parties ?? [];
+$matrix  = $matrix ?? [];
+$orphans = $orphans ?? [];
+$filters = $filters ?? [];
+
+$dateFrom = $filters['date_from'] ?? '';
+$dateTo   = $filters['date_to'] ?? '';
+$anneeId  = $filters['annee_id'] ?? '';
+$moduleId = $filters['module_id'] ?? '';
+
+$baseUrl = (require dirname(__DIR__, 2) . '/config/app.php')['base_url'] ?? '';
+$baseUrl = rtrim($baseUrl, '/');
+
+?>
+
+<h1 class="h4 mb-3">Cahier de texte — Matrice (Parties × Classes)</h1>
+
+<form method="get" class="card mb-3">
+  <div class="card-body">
+    <div class="row g-2 align-items-end">
+      <div class="col-sm-3">
+        <label class="form-label">Du</label>
+        <input type="date" name="date_from" class="form-control" value="<?= $this->e((string)$dateFrom) ?>">
+      </div>
+      <div class="col-sm-3">
+        <label class="form-label">Au</label>
+        <input type="date" name="date_to" class="form-control" value="<?= $this->e((string)$dateTo) ?>">
+      </div>
+      <div class="col-sm-3">
+        <label class="form-label">Module ID (optionnel)</label>
+        <input type="number" min="1" name="module_id" class="form-control" value="<?= $this->e((string)$moduleId) ?>">
+      </div>
+
+      <div class="col-12 mt-2 d-flex gap-2">
+        <button class="btn btn-dark" type="submit"><i class="bi bi-funnel"></i> Filtrer</button>
+        <a class="btn btn-outline-secondary" href="<?= $baseUrl ?>/notebook/global"><i class="bi bi-x-circle"></i> Réinitialiser</a>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="card">
+  <div class="card-header fw-semibold">Matrice</div>
+
+  <div class="table-responsive">
+    <table class="table table-sm table-bordered mb-0 align-middle w-auto notebook-matrix" style="table-layout:auto;">
+      <thead class="table-light">
+        <tr>
+          <th class="col-partie">Partie</th>
+          <?php foreach ($classes as $c): ?>
+            <th class="text-center col-classe"><?= $this->e($c['classe']) ?></th>
+          <?php endforeach; ?>
+        </tr>
+      </thead>
+
+      <tbody>
+        <!-- Ligne Orphelines -->
+        <tr class="table-danger">
+          <td class="fw-semibold">
+            <i class="bi bi-exclamation-triangle"></i> Séances non affectées
+          </td>
+
+          <?php foreach ($classes as $c): ?>
+            <?php
+              $cid = (int)$c['id'];
+              $dates = $orphans[$cid] ?? [];
+            ?>
+            <td>
+              <?php if (empty($dates)): ?>
+                <span class="text-muted small">—</span>
+              <?php else: ?>
+                <?php foreach ($dates as $it): ?>
+                    <a class="badge text-bg-danger me-1 mb-1 text-decoration-none"
+                        href="<?= $baseUrl ?>/seances/<?= (int)$it['id'] ?>"
+                         title="<?= $this->e(DateHelper::toFr((string)$it['date'])) ?>">
+                        <?= $this->e(DateHelper::toDdMm((string)$it['date'])) ?>
+                    </a>
+                <?php endforeach; ?>
+              <?php endif; ?>
+            </td>
+          <?php endforeach; ?>
+        </tr>
+
+        <?php
+          $colspan = 1 + count($classes);
+
+          // Palette de couleurs Bootstrap (tu peux ajuster)
+          $moduleRowClassMap = [
+              0 => 'table-secondary', // Divers
+              1 => 'table-primary',
+              2 => 'table-success',
+              3 => 'table-info',
+              4 => 'table-warning',
+          ];
+        ?>
+
+        <!-- Lignes Parties -->
+        <?php foreach ($parties as $p): ?>
+          <?php
+            $pid = (int)$p['partie_id'];
+            $mid = (int)$p['module_id'];
+            $niv = (int)$p['niv'];
+            $devoir  = (int)$p['devoir'];
+
+            // Changement de module => nouvelle couleur
+            $rowClass = ($devoir) ? 'table-danger' : $moduleRowClassMap[$mid] ?? 'table-light'; // fallback si module inattendu
+          ?>
+
+          <?php if ($niv === 1): ?>
+            <!-- Ligne titre (niv=1) prend toute la largeur -->
+            <tr class="<?= $rowClass ?>">
+              <td class="fw-semibold text-center" colspan="<?= $colspan ?>">
+                <?= str_replace('|','<br>',$this->e($p['label'])) ?>
+              </td>
+            </tr>
+          <?php else: ?>
+            <!-- Ligne normale : dates par classe -->
+            <tr class="<?= $rowClass ?>">
+              <td class="fw-semibold"><?= $this->e($p['label']) ?></td>
+
+              <?php foreach ($classes as $c): ?>
+                <?php
+                  $cid = (int)$c['id'];
+                  $dates = $matrix[$pid][$cid] ?? [];
+                ?>
+                <td>
+                  <?php if (empty($dates)): ?>
+                    <span class="text-muted small">—</span>
+                  <?php else: ?>
+                    <?php foreach ($dates as $it): ?>
+                      <a class="badge text-bg-secondary me-1 mb-1 text-decoration-none"
+                        href="<?= $baseUrl ?>/seances/<?= (int)$it['id'] ?>"
+                        title="<?= $this->e(DateHelper::toFr((string)$it['date'], 'dd/MM/yyyy')) ?>">
+                        <?= $this->e(DateHelper::toDdMm((string)$it['date'])) ?>
+                      </a>
+                    <?php endforeach; ?>
+                  <?php endif; ?>
+                </td>
+              <?php endforeach; ?>
+            </tr>
+          <?php endif; ?>
+
+        <?php endforeach; ?>
+
+        <?php if (empty($parties)): ?>
+          <tr>
+            <td colspan="<?= 1 + count($classes) ?>" class="text-center text-muted py-4">
+              Aucune partie trouvée (vérifie module_id).
+            </td>
+          </tr>
+        <?php endif; ?>
+      </tbody>
+    </table>
+  </div>
+</div>
+--------------------------------------------------------------------------------
+6- Controllers/Api/NotebookApiController.php
+--------------------------------------------------------------------------------
+<?php
+declare(strict_types=1);
+
+namespace App\Controllers\Api;
+
+use App\Core\Controller;
+use App\Services\NotebookService;
+
+final class NotebookApiController extends Controller
+{
+    public function __construct(private NotebookService $service) {}
+
+    public function global(): void
+    {
+        $filters = [
+            'annee_id'     => $_GET['annee_id']     ?? null,
+            'classe_id'    => $_GET['classe_id']    ?? null,
+            'date_from'    => $_GET['date_from']    ?? null,
+            'date_to'      => $_GET['date_to']      ?? null,
+            'only_orphans' => isset($_GET['only_orphans']) && $_GET['only_orphans'] !== '0',
+        ];
+        $filters = array_filter($filters, static fn($v) => $v !== null && $v !== '');
+
+        $data = $this->service->getGlobalNotebook($filters);
+
+        $this->json([
+            'ok' => true,
+            'stats' => $data['stats'],
+            'items' => $data['items'],
+        ]);
+    }
+}
+--------------------------------------------------------------------------------
+7- User.php
+--------------------------------------------------------------------------------
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use App\Core\Model;
+
+class User extends Model
+{
+    protected static string $table = 'users';
+
+    public static function findByUsername(string $username): ?array
+    {
+        $rows = self::where('username = :u AND deleted_at IS NULL', ['u' => $username], 1);
+        return $rows[0] ?? null;
+    }
+
+    /**
+     * Retourne 1 si l'utilisateur est en mode Ramadan, sinon 0
+     */
+    public static function isRamadan(int $userId): int
+    {
+        $rows = self::where(
+            'id = :i AND deleted_at IS NULL',
+            ['i' => $userId],
+            1
+        );
+
+        if (empty($rows)) {
+            return 0;
+        }
+
+        return (int)($rows[0]['ramadan'] ?? 0);
+    }
+}
