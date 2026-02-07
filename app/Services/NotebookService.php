@@ -166,12 +166,55 @@ final class NotebookService
         // tri des classes par nom
         uasort($byClasse, static fn($a, $b) => strcmp((string)$a['classe'], (string)$b['classe']));
 
+        $prefixes = [];
+
+        foreach ($byClasse as $pack) {
+            foreach (($pack['items'] ?? []) as $it) {
+                foreach (($it['parts'] ?? []) as $p) {
+                    $num = trim((string)($p['num'] ?? ''));
+                    if ($num === '') continue;
+
+                    // "M1 L1 : 2.3" => prefix = "M1 L1"
+                    $tmp = array_map('trim', explode(':', $num, 2));
+                    $prefix = $tmp[0] ?? '';
+                    if ($prefix !== '') $prefixes[$prefix] = true;
+                }
+            }
+        }
+
+        $prefixes = array_keys($prefixes);
+
+        $rootByPrefix = [];
+
+        if (!empty($prefixes)) {
+            $needNums = array_map(fn($p) => $p . ' : 0', $prefixes);
+
+            $in = implode(',', array_fill(0, count($needNums), '?'));
+
+            $sql = "SELECT num, partie FROM parties WHERE num IN ($in)";
+            $stmt = \App\Core\Database::pdo()->prepare($sql);
+            $stmt->execute($needNums);
+
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                $num = trim((string)($r['num'] ?? ''));       // ex "M1 L1 : 0"
+                $partie = trim((string)($r['partie'] ?? '')); // ex "Introduction"
+
+                // prefix = "M1 L1"
+                $tmp = array_map('trim', explode(':', $num, 2));
+                $prefix = $tmp[0] ?? '';
+                if ($prefix !== '' && $partie !== '') {
+                    $rootByPrefix[$prefix] = $partie;
+                }
+            }
+        }
+
         return [
             'annee_id' => $anneeId,
             'classes' => $classes,
             'byClasse' => $byClasse,
             'hasAnyPrinted' => $hasAnyPrinted,
             'filters' => $filters,
+            'rootByPrefix' => $rootByPrefix,
         ];
     }
 

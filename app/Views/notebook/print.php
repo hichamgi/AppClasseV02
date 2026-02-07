@@ -25,118 +25,41 @@ $coverYear = trim((string)($annee_label ?? ''));
 if ($coverYear === '') $coverYear = '—';
 
 $h = fn($s) => $this->e((string)$s);
-
-/**
- * Si une partie contient "absen" => message spécial
- */
-function startsWithAbsences(array $parts): bool
-{
-    foreach ($parts as $p) {
-        $label = mb_strtolower(trim((string)($p['partie'] ?? '')));
-        if ($label !== '' && str_contains($label, 'absen')) return true;
-    }
-    return false;
-}
-
-/**
- * Construit le HTML contenu:
- * - H2 quand (module+numKey) change
- * - Liste des parties dans une seule boucle
- * - Num affiché = partie après ":" (sans "Mx Ly")
- * - Si num vide => afficher la partie sans num
- */
-function buildContentHtml(array $parts): string
-{
-    if (empty($parts)) return '<span class="muted">—</span>';
-
-    if (startsWithAbsences($parts)) {
-        return '<strong>Trop d\'absences impossible d\'assurer la séance</strong>';
-    }
-
-    $out = '';
-    $prevGroupKey = ''; // pour détecter changement (module + key MxLy)
-
-    foreach ($parts as $p) {
-        $moduleLabel = trim((string)($p['module'] ?? ''));
-        $abrev       = trim((string)($p['abrev'] ?? ''));
-        $numRaw      = trim((string)($p['num'] ?? '')); // ex "M1 L1 : 4.1.1"
-        $partLabel   = trim((string)($p['partie'] ?? ''));
-
-        // clé de regroupement = partie avant ":" (M1 L1) + module id
-        $keyLeft  = '';
-        $numRight = '';
-
-        if ($numRaw !== '') {
-            $arr = explode(':', $numRaw, 2);
-            $keyLeft  = trim($arr[0] ?? '');
-            $numRight = trim($arr[1] ?? '');
-        }
-
-        $groupKey = ((string)($p['idmodule'] ?? '')) . '|' . $keyLeft;
-
-        // H2 si changement de groupe
-        if ($groupKey !== $prevGroupKey) {
-            $title = $abrev !== '' ? $abrev : 'Module';
-            if ($moduleLabel !== '') $title .= ' : ' . $moduleLabel;
-            if ($keyLeft !== '') $title .= ' — ' . $keyLeft; // on affiche Mx Ly ici (regroupement)
-            $out .= '<h2 class="sec">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2>';
-            $prevGroupKey = $groupKey;
-        }
-
-        // Num affiché = ce qui est après ":" (sans Mx Ly)
-        $displayNum = '';
-        if ($numRaw !== '') {
-            if (preg_match('/:\s*([0-9]+(?:\.[0-9]+)*)/u', $numRaw, $m)) {
-                $displayNum = $m[1];
-            } elseif ($numRight !== '') {
-                $displayNum = $numRight;
-            }
-        }
-
-        if ($partLabel !== '') {
-            $prefix = ($displayNum !== '') ? ($displayNum . '. ') : '';
-            $out .= '<div class="line">' . htmlspecialchars($prefix . $partLabel, ENT_QUOTES, 'UTF-8') . '</div>';
-        }
-    }
-
-    return $out !== '' ? $out : '<span class="muted">—</span>';
-}
 ?>
 <style>
-    /* Zone sélection (screen only) */
     .print-toolbar {
         display: flex;
         gap: 12px;
         align-items: flex-start;
-        margin-bottom: 16px;
+        margin-bottom: 16px
     }
 
     .panel {
         border: 1px solid rgba(0, 0, 0, .12);
         border-radius: 12px;
         padding: 12px;
-        background: #fff;
+        background: #fff
     }
 
     .panel h3 {
         font-size: 14px;
-        margin: 0 0 8px;
+        margin: 0 0 8px
     }
 
     .panel .small {
         font-size: 12px;
-        color: #666;
+        color: #666
     }
 
     .list {
         max-height: 320px;
         overflow: auto;
-        padding-right: 6px;
+        padding-right: 6px
     }
 
     .cls-title {
         font-weight: 700;
-        margin-top: 10px;
+        margin-top: 10px
     }
 
     .chk {
@@ -144,18 +67,17 @@ function buildContentHtml(array $parts): string
         gap: 8px;
         align-items: center;
         margin: 4px 0;
-        font-size: 13px;
+        font-size: 13px
     }
 
     .muted {
-        color: #777;
+        color: #777
     }
 
-    /* Pages preview */
     .print-area {
         background: #f6f6f6;
         padding: 12px;
-        border-radius: 12px;
+        border-radius: 12px
     }
 
     .sheet {
@@ -163,13 +85,13 @@ function buildContentHtml(array $parts): string
         border: 1px solid rgba(0, 0, 0, .12);
         border-radius: 12px;
         padding: 12px;
-        margin: 0 auto 16px;
+        margin: 0 auto 16px
     }
 
     .two-up {
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 12px
     }
 
     .page-block {
@@ -177,20 +99,20 @@ function buildContentHtml(array $parts): string
         border-radius: 10px;
         padding: 10px;
         min-height: 360px;
-        position: relative;
+        position: relative
     }
 
     .page-block h1 {
         font-size: 18px;
         margin: 0 0 8px;
-        text-align: center;
+        text-align: center
     }
 
     .page-block table {
         width: 100%;
         border-collapse: collapse;
         font-size: 12px;
-        table-layout: fixed;
+        table-layout: fixed
     }
 
     .page-block th,
@@ -198,110 +120,103 @@ function buildContentHtml(array $parts): string
         border: 1px solid rgba(0, 0, 0, .20);
         padding: 6px;
         vertical-align: top;
-        word-wrap: break-word;
+        word-wrap: break-word
     }
 
     .page-block th {
-        background: rgba(0, 0, 0, .04);
+        background: rgba(0, 0, 0, .04)
     }
 
     .sec {
         font-size: 13px;
-        margin: 8px 0 4px;
+        margin: 8px 0 4px
     }
 
     .line {
-        margin: 2px 0;
+        margin: 2px 0
     }
 
-    /* ✅ tfoot collé en bas du bloc/page */
+    /* tfoot à la fin du tableau */
     .page-block table {
-        height: 100%;
+        height: 100%
     }
 
     .page-block tfoot td {
         vertical-align: middle;
-        padding: 8px 6px;
+        padding: 8px 6px
     }
 
     .sig {
-        text-align: center;
-        /* signature au milieu de la cellule */
+        text-align: center
     }
 
-    /* Page de garde */
     .cover {
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        height: calc(100vh - 60px);
+        height: calc(100vh - 60px)
     }
 
     .cover h1 {
         font-size: 34px;
         margin: 0 0 12px;
         text-align: center;
-        letter-spacing: .5px;
+        letter-spacing: .5px
     }
 
     .cover .b {
-        font-weight: 700;
+        font-weight: 700
     }
 
     .cover .line {
         font-size: 18px;
         margin: 4px 0;
-        text-align: center;
+        text-align: center
     }
 
-    /* PRINT RULES */
     @media print {
         .print-toolbar {
-            display: none !important;
+            display: none !important
         }
 
         .print-area {
             background: transparent;
             padding: 0;
-            border-radius: 0;
+            border-radius: 0
         }
 
         .sheet {
             border: none;
             border-radius: 0;
             padding: 0;
-            margin: 0;
+            margin: 0
         }
 
-        /* A4: 1cm partout */
         @page {
             size: A4;
-            margin: 1cm;
+            margin: 1cm
         }
 
         .sheet {
-            page-break-after: always;
+            page-break-after: always
         }
 
         .page-block {
             break-inside: avoid;
-        }
-
-        .page-block {
             border: none;
             border-radius: 0;
             padding: 0;
-            min-height: auto;
+            min-height: auto
         }
 
         .page-block table {
-            font-size: 11px;
+            font-size: 11px
         }
 
         .cover {
             height: auto;
-            page-break-after: always;
+            page-break-after: always
         }
     }
 </style>
@@ -313,7 +228,7 @@ function buildContentHtml(array $parts): string
             Sélectionne les séances à imprimer, puis clique <b>Imprimer</b>, ensuite <b>Confirmer</b> pour marquer ces séances comme imprimées.
         </div>
 
-        <form method="get" class="mt-2" style="display:flex; gap:8px; flex-wrap:wrap; align-items:end;">
+        <form method="get" class="mt-2" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
             <div>
                 <label class="small">Du</label>
                 <input type="date" name="date_from" value="<?= $h($dateFrom) ?>">
@@ -326,7 +241,7 @@ function buildContentHtml(array $parts): string
             <a class="btn btn-sm btn-outline-secondary" href="<?= $baseUrl ?>/notebook/print" style="padding:6px 10px;">Réinitialiser</a>
         </form>
 
-        <div class="mt-2" style="display:flex; gap:8px; flex-wrap:wrap;">
+        <div class="mt-2" style="display:flex;gap:8px;flex-wrap:wrap;">
             <button type="button" id="btnAll" class="btn btn-sm btn-outline-dark" style="padding:6px 10px;">Tout cocher</button>
             <button type="button" id="btnNone" class="btn btn-sm btn-outline-dark" style="padding:6px 10px;">Tout décocher</button>
             <button type="button" id="btnPrint" class="btn btn-sm btn-dark" style="padding:6px 10px;">Imprimer</button>
@@ -362,10 +277,10 @@ function buildContentHtml(array $parts): string
     <div class="panel" style="width:320px;">
         <h3>Règles</h3>
         <div class="small">
-            • Page de garde affichée si <b>aucune séance imprimée</b> dans l’année.<br>
+            • Page de garde si <b>aucune séance imprimée</b> dans l’année.<br>
             • Contenu trié <b>idmodule → idpartie</b>.<br>
             • Si une partie contient “absen…”, message spécial.<br>
-            • Footer: classe + prof + signature (dans tfoot).
+            • Pied de page via <b>tfoot</b>.
         </div>
     </div>
 </div>
@@ -373,7 +288,6 @@ function buildContentHtml(array $parts): string
 <div class="print-area" id="printArea">
 
     <?php if (!$hasAnyPrinted): ?>
-        <!-- PAGE DE GARDE -->
         <div class="sheet">
             <div class="cover">
                 <h1>CAHIER DE TEXTE</h1>
@@ -391,9 +305,7 @@ function buildContentHtml(array $parts): string
     foreach ($byClasse as $cid => $pack) {
         $classeName = (string)($pack['classe'] ?? '');
         $items = $pack['items'] ?? [];
-
         if (empty($items) && $hasAnyPrinted) continue;
-
         $blocks[] = ['classe' => $classeName, 'items' => $items];
     }
     $chunks = array_chunk($blocks, 2);
@@ -407,6 +319,11 @@ function buildContentHtml(array $parts): string
                     <?php
                     $classeName = (string)$b['classe'];
                     $items = $b['items'];
+
+                    // ✅ ces variables gardent les "anciennes valeurs" d’une séance à l’autre (POUR LA CLASSE)
+                    $lastGroupKey = '';
+                    $lastModuleId = null;
+                    $lastKeyLeft  = '';
                     ?>
 
                     <div class="page-block" data-class="<?= $h($classeName) ?>">
@@ -429,6 +346,7 @@ function buildContentHtml(array $parts): string
                                         <td colspan="3" class="muted" style="text-align:center;">Aucune séance.</td>
                                     </tr>
                                 <?php else: ?>
+
                                     <?php foreach ($items as $it): ?>
                                         <?php
                                         $sid = (int)($it['id'] ?? 0);
@@ -436,19 +354,114 @@ function buildContentHtml(array $parts): string
                                         $hStart = (string)($it['heured'] ?? '');
                                         $range = $d . ' ' . $hStart;
 
-                                        $contentHtml = buildContentHtml($it['parts'] ?? []);
                                         $abs = trim((string)($it['absences'] ?? ''));
+                                        $parts = $it['parts'] ?? [];
+
+                                        // ✅ contenu construit ICI (pas de function)
+                                        $contentHtml = '';
+                                        if (empty($parts)) {
+                                            $contentHtml = '<span class="muted">—</span>';
+                                        } else {
+                                            // détecter absences
+                                            $hasAbs = false;
+                                            foreach ($parts as $p0) {
+                                                $lab0 = mb_strtolower(trim((string)($p0['partie'] ?? '')));
+                                                if ($lab0 !== '' && str_contains($lab0, 'absen')) {
+                                                    $hasAbs = true;
+                                                    break;
+                                                }
+                                            }
+                                            if ($hasAbs) {
+                                                $contentHtml = '<strong>Trop d\'absences impossible d\'assurer la séance</strong>';
+                                            } else {
+                                                $oldModule = null;
+                                                // boucle unique, avec conservation d’état entre séances
+                                                foreach ($parts as $p) {
+                                                    $moduleId    = isset($p['idmodule']) ? (int)$p['idmodule'] : 0;
+                                                    $moduleLabel = trim((string)($p['module'] ?? ''));
+                                                    $abrev       = trim((string)($p['abrev'] ?? ''));
+                                                    $numRaw      = trim((string)($p['num'] ?? '')); // "M1 L1 : 2.3"
+                                                    $partLabel   = trim((string)($p['partie'] ?? ''));
+
+                                                    $keyLeft = '';
+                                                    $numRight = '';
+
+                                                    if ($numRaw !== '') {
+                                                        $arr = explode(':', $numRaw, 2);
+                                                        $keyLeft  = trim($arr[0] ?? ''); // "M1 L1"
+                                                        $numRight = trim($arr[1] ?? ''); // "2.3"
+                                                    }
+
+                                                    // clé pour déterminer changement (module + MxLy)
+                                                    $groupKey = $moduleId . '|' . $keyLeft;
+
+                                                    // ✅ afficher H2 seulement quand ça change vs "anciennes valeurs"
+                                                    if ($groupKey !== $lastGroupKey && $moduleId) {
+                                                        $title = ($abrev !== '' ? $abrev : 'Module');
+                                                        if ($moduleLabel !== '') $title .= ' : ' . $moduleLabel;
+
+                                                        // 🔎 chercher la partie "racine" : num == "$keyLeft : 0"
+                                                        $rootPartLabel = '';
+
+                                                        if ($keyLeft !== '') {
+                                                            foreach ($parts as $pp) {
+                                                                if (
+                                                                    isset($pp['num']) &&
+                                                                    trim((string)$pp['num']) === ($keyLeft . ' : 0')
+                                                                ) {
+                                                                    $rootPartLabel = trim((string)($pp['partie'] ?? ''));
+                                                                    break;
+                                                                }
+                                                            }
+                                                        }
+
+                                                        if ($keyLeft !== '') {
+                                                            $rootTitle = $rootByPrefix[$keyLeft] ?? '';
+                                                            $rootTitle = trim((string)$rootTitle);
+
+                                                            if ($rootTitle !== '') {
+                                                                $title .= '<br>' . $this->e($rootTitle);
+                                                            }
+                                                        }
+
+                                                        $contentHtml .= '<h2 class="sec">' . $title . '</h2>';
+
+                                                        $lastGroupKey = $groupKey;
+                                                        $lastModuleId = $moduleId;
+                                                        $lastKeyLeft  = $keyLeft;
+                                                    }
+
+                                                    // ✅ num affiché = après ":" (sans MxLy)
+                                                    $displayNum = '';
+                                                    if ($numRaw !== '') {
+                                                        if (preg_match('/:\s*([0-9]+(?:\.[0-9]+)*)/u', $numRaw, $m)) {
+                                                            $displayNum = $m[1];
+                                                        } elseif ($numRight !== '') {
+                                                            $displayNum = $numRight;
+                                                        }
+                                                    }
+
+                                                    if ($partLabel !== '') {
+                                                        $prefix = ($displayNum !== '') ? ($displayNum . '. ') : '';
+                                                        $contentHtml .= '<div class="line">' . $this->e($prefix . $partLabel) . '</div>';
+                                                    }
+                                                }
+
+                                                if ($contentHtml === '') $contentHtml = '<span class="muted">—</span>';
+                                            }
+                                        }
                                         ?>
+
                                         <tr class="js-row" data-seance-id="<?= (int)$sid ?>">
                                             <td><?= $h($range) ?></td>
                                             <td><?= $contentHtml ?></td>
                                             <td><?= $abs !== '' ? $h($abs) : '<span class="muted">—</span>' ?></td>
                                         </tr>
                                     <?php endforeach; ?>
+
                                 <?php endif; ?>
                             </tbody>
 
-                            <!-- ✅ tfoot = pied du tableau, en fin de page -->
                             <tfoot>
                                 <tr>
                                     <td><b>Classe :</b> <?= $h($classeName) ?></td>
